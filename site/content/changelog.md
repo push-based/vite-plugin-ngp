@@ -22,6 +22,10 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 
 - `ngp-extract-i18n` with a flag it doesn't know, such as `--out`, or a flag missing its value, now prints which flag was wrong and the usage text, and exits 1, instead of a Node stack trace. A `--duplicates` value other than `error`, `warning` or `ignore` is an error too, where before it acted as `warning`. [Internationalization](i18n#extract-the-messages)
 
+### Dev server
+
+- Closing a dev server in middleware mode, the setup for hosting Vite inside your own Node server, now closes the ngp compilers. The plugin closed them when Vite's HTTP server closed, and middleware mode has none, so the analyzers and their threads outlived `vite.close()`. They now close when Vite closes the server, with or without an HTTP server. [Server rendering](server-rendering#what-the-plugin-does)
+
 ## 6 November 2026
 
 ### Angular

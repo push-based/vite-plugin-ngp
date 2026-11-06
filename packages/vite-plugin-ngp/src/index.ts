@@ -634,7 +634,6 @@ function compilerPlugin(
         });
         return;
       }
-      server.httpServer?.once('close', closeCompilers);
       if (typeCheck) {
         const viteHmr = server.config.server.hmr;
         typeCheckOverlay = viteHmr !== false && (typeof viteHmr !== 'object' || viteHmr.overlay !== false);
@@ -720,13 +719,20 @@ function compilerPlugin(
       config.logger.info(report.info);
     },
 
-    // Also runs when the dev server closes: a check still writing to the cache would outlive it.
-    // Vitest closes its Vite server through here, with no HTTP server to wait for.
+    // Also runs for each environment when the dev server closes: a check still writing to the cache
+    // would outlive it. A dev server's compilers close in closeServer, after every environment.
     async closeBundle() {
       await devCheck?.close();
-      if (config.command === 'build' || testing) {
+      if (config.command === 'build') {
         return closeCompilers();
       }
+    },
+
+    // Runs when a dev server closes or restarts, once every environment has finished its requests.
+    // That covers `vite dev`, Vitest's server, and middleware mode, which has no HTTP server to close.
+    // After a restart, the next request creates the compilers again.
+    closeServer() {
+      return closeCompilers();
     },
 
     // The dev server's overlay client for type errors.
