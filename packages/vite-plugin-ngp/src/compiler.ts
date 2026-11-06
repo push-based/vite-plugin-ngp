@@ -55,6 +55,8 @@ export class NgpCompiler {
   private updates: Promise<unknown> = Promise.resolve();
   /** Type-check blocks as last generated, null for files without one. Stale files are dropped. */
   private readonly tcbs = new Map<string, string | null>();
+  /** What the analyzer reported stale for each deleted file, to re-send when the file comes back. */
+  private readonly importersOfRemoved = new Map<string, string[]>();
 
   private constructor(
     private readonly analyzer: Analyzer,
@@ -178,6 +180,7 @@ export class NgpCompiler {
       // A file we haven't seen yet: from a transform, the analyzer has read (or will read) the
       // same disk content, so compare against disk. From the watcher, disk already holds the edit,
       // so the only safe answer is that it changed.
+      const unseen = !this.known.has(file);
       const previous =
         this.known.get(file) ??
         (origin === 'transform' ? await fs.readFile(file, 'utf8').catch(() => undefined) : undefined);
@@ -185,7 +188,20 @@ export class NgpCompiler {
       if (previous === content) {
         return {stale: [], previous};
       }
-      return {stale: this.dropStale(file, await this.analyzer.updateFileContent([{filePath: file, content}])), previous};
+      // A file the analyzer may be seeing for the first time: only the watcher reports those, since
+      // at startup every file is unseen and arrives from a transform. The analyzer re-resolves
+      // module specifiers and re-reads the tsconfig's file list only for a file it's told was
+      // created, and updateFileContent can't tell it that — by the time the watcher reports a new
+      // file it's already on disk, so the analyzer takes it for an ordinary change.
+      const created = unseen && origin === 'watcher';
+      const invalidated = created
+        ? await this.analyzer.invalidateFiles([{filePath: file, updateType: FileUpdateType.Created}])
+        : [];
+      invalidated.push(...(await this.analyzer.updateFileContent([{filePath: file, content}])));
+      if (created) {
+        invalidated.push(...(await this.resendImporters(file)));
+      }
+      return {stale: this.dropStale(file, invalidated), previous};
     });
   }
 
@@ -202,8 +218,38 @@ export class NgpCompiler {
     return this.enqueue(async () => {
       this.known.delete(file);
       const invalidated = await this.analyzer.invalidateFiles([{filePath: file, updateType: FileUpdateType.Deleted}]);
+      const importers = invalidated.map((f) => path.resolve(f)).filter((f) => f !== file);
+      if (importers.length > 0) {
+        this.importersOfRemoved.set(file, importers);
+      }
       return this.dropStale(file, invalidated);
     });
+  }
+
+  /**
+   * Re-sends, unchanged, the content of the files the analyzer reported stale when `file` was
+   * deleted, and resolves to what that made stale.
+   *
+   * Deleting a file drops the edge from each importer to it, so when the file comes back the
+   * analyzer has nothing to connect them: it reports only the file itself as stale and leaves
+   * every importer analyzed as it was, failed resolution and all. Sending an importer's content
+   * is the only way to ask for it to be analyzed again. The content is what the analyzer already
+   * has, so this costs one analysis per importer and changes nothing else.
+   */
+  private async resendImporters(file: string): Promise<string[]> {
+    const importers = this.importersOfRemoved.get(file);
+    this.importersOfRemoved.delete(file);
+    if (!importers) {
+      return [];
+    }
+    const updates: {filePath: string; content: string}[] = [];
+    for (const importer of importers) {
+      const content = this.known.get(importer) ?? (await fs.readFile(importer, 'utf8').catch(() => undefined));
+      if (content !== undefined) {
+        updates.push({filePath: importer, content});
+      }
+    }
+    return updates.length > 0 ? this.analyzer.updateFileContent(updates) : [];
   }
 
   /**

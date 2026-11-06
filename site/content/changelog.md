@@ -7,6 +7,20 @@ description: What changed in vite-plugin-ngp, newest first, for anyone following
 
 What changed in vite-plugin-ngp, newest first, written for people using it. Every entry links to the page that documents it. Versions on npm, with the commits in each, are in the repo's [CHANGELOG.md](https://github.com/push-based/vite-plugin-ngp/blob/main/CHANGELOG.md) and its [GitHub releases](https://github.com/push-based/vite-plugin-ngp/releases).
 
+## 6 November 2026
+
+### Angular
+
+- The plugin moved from Angular `22.3.0-next.2` to `22.3.0-next.4`, and the ngp it carries is built from the commit that release was cut at. Move every `@angular/*` package in your app with it: the pin is still exact, because ngp imports private APIs from `@angular/compiler-cli`. [Getting started](getting-started)
+
+### Type-checking
+
+- ngp now runs Angular's extended diagnostics, the NG81xx template checks `ng build` reports, so an uninvoked signal in an interpolation or a unitless CSS length is a warning in your terminal while the module compiles. They come out of the compile, not the type-check pass, so you get them with `typeCheck: false` too, and your tsconfig's `angularCompilerOptions.extendedDiagnostics` decides their severity. [Type-checking](type-checking#angulars-extended-diagnostics)
+
+### Dev server
+
+- Restoring a file you deleted recovers again. The newer analyzer drops the edge from an importer to a file it's told was deleted, so a restored component stayed "not a known element" until the importer was edited; the plugin now tells the analyzer about created files and re-analyzes the importers itself. [How it works](how-it-works#handling-an-edit)
+
 ## 21 October 2026
 
 ### Packaging

@@ -83,7 +83,7 @@ Nx can also build a library on its own: `@nx/angular:package` runs ng-packagr an
 
 What to do depends on why the library is buildable:
 
-- **To publish it.** Keep `nx build my-lib`. ng-packagr publishes a version next to every Angular version, and `22.3.0-next.2`, the version the plugin pins, is on npm. That's as far as it was checked: nobody has run it in this repo.
+- **To publish it.** Keep `nx build my-lib`. ng-packagr publishes a version next to every Angular version, but it can lag: its newest prerelease is `22.3.0-next.3` where the plugin pins `22.3.0-next.4`, so a library build runs ng-packagr one prerelease behind the compiler it loads from your app. That's as far as it was checked: nobody has run it in this repo.
 - **For incremental builds, so the app doesn't recompile it.** Point the alias at the library's source, `libs/<name>/src/index.ts`, instead of `dist/libs/<name>`. The plugin compiles a file when it's asked for, so there's nothing to gain from building the library ahead of the app, and an edit in the library updates the page in place instead of waiting for `nx build my-lib`.
 - **To consume it built, from `dist/`.** Untested. It should work: the plugin's linker runs on any JavaScript module that contains partially compiled declarations, wherever it lives, in builds and in the dev server's transform. What's untested is whether Vite's dependency pre-bundling in the dev server sees an aliased `dist/` folder, which decides whether the library is linked once at startup or per module.
 

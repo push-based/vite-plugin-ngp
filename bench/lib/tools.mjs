@@ -1,5 +1,5 @@
 // The toolchains, each as its documented default setup. Every one runs from bench/node_modules
-// with the same Angular (22.3.0-next.2) and, for the Vite-based ones, the same Vite (8.3.4).
+// with the same Angular (22.3.0-next.4) and, for the Vite-based ones, the same Vite (8.3.4).
 // A real app (lib/apps.mjs, kind 'real') brings its own CLI in its own node_modules, as a tool
 // its pin describes, and gets vite-plugin-ngp through a link into its node_modules.
 

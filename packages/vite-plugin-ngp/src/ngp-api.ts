@@ -1,5 +1,5 @@
 // The slice of ngp's API this plugin uses, typed by hand. ngp isn't published, so there's no
-// package to take types from; these match `toolchain/out/preprocessor/api.js` at Angular 92e5aa8.
+// package to take types from; these match `toolchain/out/preprocessor/api.js` at Angular b355f62.
 
 import {existsSync} from 'node:fs';
 import * as fs from 'node:fs/promises';
@@ -51,8 +51,9 @@ export interface Analyzer {
   updateFileContent(updates: {filePath: string; content: string}[]): Promise<string[]>;
   /**
    * Drops each file from the analyzer's in-memory overlay, so it reads the file from disk again (or
-   * finds it gone). Resolves to every TypeScript file whose analysis is now stale. At 92e5aa8 the
-   * Rust side ignores `updateType` and treats every entry alike.
+   * finds it gone). Resolves to every TypeScript file whose analysis is now stale. Since
+   * 22.3.0-next.3 `updateType` matters: `Created` and `Deleted` also make the analyzer resolve
+   * module specifiers and read the tsconfig's file list again, which `Changed` doesn't.
    */
   invalidateFiles(updates: {filePath: string; updateType: FileUpdateType}[]): Promise<string[]>;
   getTsFileForTemplate(templatePath: string): Promise<{tsFilePath: string}[] | null>;
@@ -99,7 +100,7 @@ export interface NgpApi {
     options: {optimize: boolean; enableHmr: boolean; backend: Engine; nativeBinding?: string; wasmBinding?: string},
   ): Promise<Analyzer>;
   HybridCompiler: new (analyzer: Analyzer, options: HybridCompilerOptions) => HybridCompiler;
-  buildTypeCheckingConfig(ngOptions: unknown, strictTemplates: boolean): unknown;
+  buildTypeCheckingConfig(ngOptions: unknown, enableTemplateTypeChecker: boolean): unknown;
 }
 
 /**

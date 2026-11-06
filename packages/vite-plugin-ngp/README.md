@@ -6,7 +6,7 @@ Vite plugin that compiles Angular one module at a time with ngp, the Rust-and-Ty
 
 ## Before you install
 
-Angular hasn't published ngp, so this package carries its own build of it, from Angular's source at the commit behind `22.3.0-next.2`. It has native engines for macOS (arm64, x64) and glibc Linux (x64, arm64). Anywhere else, Alpine included, set `engine: 'wasm'`. Every `@angular/*` package must be exactly `22.3.0-next.2`, because ngp uses private APIs of the compiler it was built with.
+Angular hasn't published ngp, so this package carries its own build of it, from Angular's source at the commit behind `22.3.0-next.4`. It has native engines for macOS (arm64, x64) and glibc Linux (x64, arm64). Anywhere else, Alpine included, set `engine: 'wasm'`. Every `@angular/*` package must be exactly `22.3.0-next.4`, because ngp uses private APIs of the compiler it was built with.
 
 ```ts
 import {defineConfig} from 'vite';

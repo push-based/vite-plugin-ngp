@@ -35,6 +35,33 @@ It checks every `.ts` file your tsconfig includes, not just the pages you've ope
 
 Turn it off with [`typeCheck: false`](configuration). It's also off by default when Vitest runs the plugin.
 
+## Angular's extended diagnostics
+
+Since Angular `22.3.0-next.3`, ngp also runs Angular's [extended diagnostics](https://angular.dev/extended-diagnostics), the NG81xx template checks `ng build` reports: a signal interpolated without being invoked (NG8109), a number bound to a CSS length (NG8119), `*ngIf` with neither `NgIf` nor `CommonModule` imported (NG8103), a banana-in-a-box (NG8101), an unused standalone import (NG8113), and the rest.
+
+These come out of the compile, not the `tsgo` pass, so you get them with [`typeCheck: false`](configuration) too, and you see them as soon as the module is compiled rather than after the next check:
+
+```text
+10:42:07 AM [vite] warning: NG8109: count is a function and should be invoked: count()}. Find more at https://v22.angular.dev/extended-diagnostics/NG8109
+  Plugin: vite-plugin-ngp
+  File: /Users/you/app/src/app/counter.ts
+```
+
+They're warnings, so they don't fail `vite build`. Your tsconfig's `angularCompilerOptions.extendedDiagnostics` decides that, the same way it does under `ng build`: `defaultCategory` makes the lot errors or suppresses them, and `checks` sets one at a time.
+
+```json title="tsconfig.json"
+{
+  "angularCompilerOptions": {
+    "extendedDiagnostics": {
+      "defaultCategory": "error",
+      "checks": {"interpolatedSignalNotInvoked": "suppress"}
+    }
+  }
+}
+```
+
+An extended diagnostic set to `error` fails the build like any other compile error.
+
 ## Checking with tsrs
 
 `tsgo` is what the plugin installs and runs. `typeChecker: 'tsrs'` runs the same check with [tsrs](https://github.com/oxc-project/tsrs) instead: the Oxc project's Rust port of the TypeScript 7 compiler, with tsc's command line and tsc's output. The plugin hands it the tsconfig it writes for `tsgo`, unchanged, and reads the same `file(line,col): error TSxxxx: message` lines, so errors land in the same places. The repo's end-to-end test plants the same errors and runs against both.
