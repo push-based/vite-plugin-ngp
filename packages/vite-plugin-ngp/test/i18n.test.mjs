@@ -2,6 +2,7 @@
 // design.md). Run `pnpm build` first; the last two tests need an ngp toolchain build.
 
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -79,6 +80,26 @@ test('negotiateLocale picks the first built locale the browser accepts', () => {
   assert.equal(negotiateLocale('de-CH,de;q=0.9,en;q=0.8', locales)?.code, 'de');
   assert.equal(negotiateLocale('fr;q=0.9,en-GB;q=0.8', locales)?.code, 'en-US');
   assert.equal(negotiateLocale('fr', locales), undefined);
+});
+
+test('ngp-extract-i18n prints usage, not a stack trace, for a flag it does not know', () => {
+  const bin = path.join(repo, 'packages/vite-plugin-ngp/bin/ngp-extract-i18n.js');
+  const run = (...args) => spawnSync(process.execPath, [bin, ...args], {encoding: 'utf8'});
+
+  for (const args of [['--out', 'foo.xlf'], ['--root']]) {
+    const bad = run(...args);
+    assert.equal(bad.status, 1, `${args.join(' ')}: ${bad.stderr}`);
+    assert.doesNotMatch(bad.stderr, /^ {4}at /m);
+    assert.match(bad.stderr, /Usage: ngp-extract-i18n \[options\]/);
+  }
+
+  const duplicates = run('--duplicates', 'nope');
+  assert.equal(duplicates.status, 1);
+  assert.match(duplicates.stderr, /unknown --duplicates 'nope'\. Use one of error, warning, ignore\./);
+
+  const help = run('--help');
+  assert.equal(help.status, 0);
+  assert.match(help.stdout, /Usage: ngp-extract-i18n \[options\]/);
 });
 
 test('vite build writes one translated folder per locale', async () => {

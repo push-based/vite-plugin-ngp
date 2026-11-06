@@ -18,6 +18,10 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 - [Configuration](configuration#when-to-change-them) and [Status and limits](status#where-its-weakest) now give the same type-check figures as [Type-checking](type-checking#checking-with-tsrs) and [Performance](performance#type-errors-in-the-dev-server), from the rerun: on the 5,000-component app a planted template error reaches the terminal in 1.36 s with `tsgo` and 1.02 s with tsrs. They still carried 1.56 s and 1.12 s from the single earlier run, and 1.45 s.
 - The compile-time globals table in [How it works](how-it-works#compile-time-globals) now says `ngHmrMode` is `false` in builds, in server environments, under Vitest and with `hmr: false`, not only under Vitest.
 
+### i18n
+
+- `ngp-extract-i18n` with a flag it doesn't know, such as `--out`, or a flag missing its value, now prints which flag was wrong and the usage text, and exits 1, instead of a Node stack trace. A `--duplicates` value other than `error`, `warning` or `ignore` is an error too, where before it acted as `warning`. [Internationalization](i18n#extract-the-messages)
+
 ## 6 November 2026
 
 ### Angular
