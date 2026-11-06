@@ -101,7 +101,7 @@ Every option of `@angular/build:application`, as of Angular 22.3:
 | `sourceMap` | `build.sourcemap`: `true`, or `'hidden'` for `hidden`. Vite has no separate switch for vendor or style maps |
 | `optimization` | On by default in `vite build`: Rolldown minifies, and the plugin runs the CLI's build optimizer. `styles.inlineCritical` and `fonts.inline` have no equivalent |
 | `outputHashing` | Vite hashes every file name by default. `build.rolldownOptions.output` changes the patterns |
-| `outputPath` | `build.outDir`. With the plugin's `ssr`, output goes to `dist/client` and `dist/server` |
+| `outputPath` | `build.outDir`. With the plugin's `ssr`, output goes to `<outDir>/client` and `<outDir>/server` |
 | `deleteOutputPath` | `build.emptyOutDir` |
 | `extractLicenses` | `build.license`, which writes `.vite/license.md` instead of `3rdpartylicenses.txt` |
 | `namedChunks` | Vite names chunks after their file by default |

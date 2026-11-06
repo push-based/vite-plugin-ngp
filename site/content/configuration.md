@@ -55,7 +55,7 @@ export default defineConfig({
 
 **`entryOnlyTsconfig: false`** makes the analyzer read your tsconfig as it is. Use it if a file the analyzer should see isn't reachable from `entries`. Expect edits to get slower as the app grows: about 172 ms per edit at 5,000 components, against 1 ms.
 
-**`ssr: true`** renders every page on the server in the dev server, and makes `vite build` build two bundles: `dist/client` for the browser and `dist/server/main.server.js` for the server. The entry's default export must be `render(url, document)`.
+**`ssr: true`** renders every page on the server in the dev server, and makes `vite build` build two bundles below your `build.outDir` (`dist` by default): `<outDir>/client` for the browser and `<outDir>/server/main.server.js` for the server. The entry's default export must be `render(url, document)`.
 
 **`typeCheck: false`** skips the check in the dev server and in builds. Use it if you already run `tsc` or `ng build` in CI and the dev-server check is too slow on your app, or if your `cacheDir` is outside the project. Builds then succeed with type errors in them.
 
@@ -113,7 +113,7 @@ You don't configure these, but they explain what you see when you debug:
 - A dev-server middleware that answers `/@ng/component` requests with component updates.
 - With `typeCheck`: a `vite-plugin-ngp/type-check` folder in Vite's cache directory, holding the type-check blocks, the check's tsconfig and its incremental build info. In the dev server, a script tag in `index.html` loads `/@ngp/type-check-client.js`, which shows type errors in Vite's overlay. It's left out when `server.hmr.overlay` is `false`.
 - A resolver for component stylesheet names in the dev server, like `card.ngp-de07cd19.css`, and a transform that scopes component stylesheets after Vite's CSS plugin has compiled them. See [Component styles](styles).
-- With `ssr`: `builder: {}` and output directories for the `client` and `ssr` environments, and a middleware that renders page requests through your server entry.
+- With `ssr`: `builder: {}`, `build.outDir` for the `client` environment as `<outDir>/client` and for the `ssr` environment as `<outDir>/server`, unless you set an environment's own `build.outDir`, and a middleware that renders page requests through your server entry.
 - Under Vitest, none of the above except the linker. Instead: `test.server.deps.inline` with every Angular library, from `devDependencies` too, so they get linked; a cache key generator that keeps your app's modules out of Vitest's module cache; and a watcher that sends edits to the analyzer, since Vitest turns Vite's HMR off. See [Testing with Vitest](testing).
 - With `fileReplacements`: a `load` hook that returns the replacement's content for the replaced file, and watches the replacement.
 - With `polyfills`: one import per polyfill at the top of each module in `entries`. With `zone.js`, a `transform` in the dev server and a `renderChunk` in builds that rewrite `async` functions with esbuild.
