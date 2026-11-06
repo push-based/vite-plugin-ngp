@@ -12,6 +12,9 @@ import {inlineStylesheets, rewriteToUrls, scopeStylesheet, stylesheetName} from 
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const playground = path.join(repo, 'playground');
+// Not the playground's own node_modules/.vite: every test file that builds or serves the
+// playground would share it, and two writing the type-check tsconfig at once corrupt it.
+const cacheDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '.tmp/styles-cache');
 process.env.NGP_TOOLCHAIN ??= path.join(repo, 'toolchain/out');
 
 // ngp's output for two components, cut down to the parts the rewrites look at.
@@ -54,7 +57,7 @@ test('build: imports each stylesheet and scopes only the emulated ones', () => {
 });
 
 test('dev server: compiles the playground SCSS and scopes it to the requested id', async () => {
-  const server = await createServer({root: playground, logLevel: 'silent', server: {hmr: false, ws: false}});
+  const server = await createServer({root: playground, cacheDir, logLevel: 'silent', server: {hmr: false, ws: false}});
   try {
     const client = server.environments.client;
     const component = await client.transformRequest('/src/app/pages/styles/scss-meter.ts');
@@ -74,6 +77,7 @@ test('dev server: compiles the playground SCSS and scopes it to the requested id
 test('build: inlines the playground SCSS, scoped, into the client and server bundles', async () => {
   const builder = await createBuilder({
     root: playground,
+    cacheDir,
     logLevel: 'silent',
     environments: {client: {build: {write: false}}, ssr: {build: {write: false}}},
   });

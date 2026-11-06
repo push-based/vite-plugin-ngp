@@ -52,6 +52,7 @@ test('zone.js apps: zone.js loads first and tracks async code, in dev', async ()
   const root = await copyFixture('ng-build-app', 'zone-dev');
   const server = await createServer({
     root,
+    cacheDir: path.join(root, '.vite'),
     configFile: false,
     logLevel: 'silent',
     server: {middlewareMode: true, ws: false},

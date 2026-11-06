@@ -68,6 +68,7 @@ before(async () => {
 
   server = await createServer({
     root,
+    cacheDir: path.join(root, '.vite'),
     configFile: false,
     logLevel: 'silent',
     // No type-check: nothing here looks at it, and it would run tsgo on every core 300 ms after
