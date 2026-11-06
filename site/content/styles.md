@@ -41,7 +41,7 @@ Measured on the playground, a chunk with stylesheet files is 3 to 5% smaller tha
 
 ## Under Vitest
 
-Specs get stylesheets the build way, inlined, because nothing would load a `<link>` in jsdom. Vitest stubs CSS to empty strings by default, so components render unstyled. Set `test.css: true` if a spec checks styles: the scoped SCSS then reaches the page, and `getComputedStyle` sees it. See [Testing with Vitest](testing).
+Specs get stylesheets the build way, inlined, because nothing would load a `<link>` in Node or jsdom. Vitest stubs CSS to empty strings by default, so components render unstyled. Set `test.css: true` if a spec checks styles: the scoped SCSS then reaches the page, and `getComputedStyle` sees it. See [Testing with Vitest](testing).
 
 ## Differences from the Angular CLI
 

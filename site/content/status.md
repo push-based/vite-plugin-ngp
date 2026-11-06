@@ -21,7 +21,7 @@ vite-plugin-ngp is a first version on top of a prototype compiler. This page say
 | Build options from angular.json | `fileReplacements`, `budgets` and `polyfills` work, zone.js apps included. Every other option maps to Vite config; [Migrating from ng build](migrating-from-ng-build) lists each |
 | Server rendering and hydration | Works in the dev server and in builds, with the `ssr` option. This site is prerendered that way |
 | Internationalization | Works: `i18n` attributes and `$localize`, extraction with `ngp-extract-i18n`, and one translated folder per locale from a single build, with server rendering too. The playground ships English and German. See [Internationalization](i18n) |
-| Vitest with TestBed | Works, with jsdom and zoneless TestBed. A run compiles only the specs it runs and what they import. Watch mode reruns specs after template edits too. See [Testing with Vitest](testing) |
+| Vitest with TestBed | Works three ways, with zoneless TestBed: in Node on the server platform's DOM (Domino), so a passing component also renders on the server; on jsdom; and in Chromium through Vitest's browser mode. The playground runs its specs all three ways. A run compiles only the specs it runs and what they import. Watch mode reruns specs after template edits too. See [Testing with Vitest](testing) |
 | Nx workspaces | Work, for one app at a time, with its libraries compiled from source through tsconfig paths turned into Vite aliases. Checked on Ghostfolio, an Nx 23 workspace with two Angular libraries, with Vite's root at the workspace root and at the app's folder. See [Migrating inside an Nx workspace](nx) |
 | [Type-checking](type-checking) | Works, for templates and TypeScript, with TypeScript 7 in a separate process. Errors show in the dev server's terminal and overlay, and fail `vite build`. Planted errors land where `ng build` puts them. Checked on this site and the playground. At 5,000 components a planted error shows 1.36 s after the edit with `tsgo` and 1.02 s with tsrs ([Performance](performance#type-errors-in-the-dev-server)). Opt-in: the same check with tsrs, Oxc's Rust port of TypeScript 7, through `typeChecker: 'tsrs'` ([Checking with tsrs](type-checking#checking-with-tsrs)) |
 
@@ -33,7 +33,7 @@ vite-plugin-ngp is a first version on top of a prototype compiler. This page say
 | HTTP status codes from SSR | Missing. `render` returns HTML only, so a not-found page answers 200 when a Node server renders it |
 | Prerendering, the service worker, critical CSS inlining, subresource integrity, `autoCsp` | Not supported. [Migrating from ng build](migrating-from-ng-build#cant-move-yet) lists what an `ng build` app can't bring along |
 | Library builds | Not supported. The plugin compiles apps, and writes no `.d.ts` files, partially compiled output or Angular Package Format bundle. A library you publish keeps ng-packagr through `ng build` or `nx build`. See [Buildable and publishable libraries](nx#buildable-and-publishable-libraries) |
-| Vitest beyond jsdom | Untried: happy-dom, browser mode, the `node` environment, coverage. `fakeAsync` needs `zone.js`, which the documented setup leaves out |
+| Vitest beyond those | Untried: happy-dom, browser mode on Firefox and WebKit, coverage. `fakeAsync` needs `zone.js`, which the documented setup leaves out |
 | Windows | Untested. The package has no native engine for it, and nobody has tried `engine: 'wasm'` there. WSL 2 is Linux, so it gets the native engine |
 
 ## Where it's weakest
