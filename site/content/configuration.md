@@ -59,7 +59,7 @@ export default defineConfig({
 
 **`typeCheck: false`** skips the check in the dev server and in builds. Use it if you already run `tsc` or `ng build` in CI and the dev-server check is too slow on your app, or if your `cacheDir` is outside the project. Builds then succeed with type errors in them.
 
-**`typeChecker: 'tsrs'`** runs the same check with tsrs, a pre-1.0 Rust port of TypeScript 7, after `npm install -D tsrs`. On a 5,000-component app it reported a planted error in 1.12 s against `tsgo`'s 1.56 s; on a small app there's nothing to gain. No package for Intel Macs. See [Checking with tsrs](type-checking#checking-with-tsrs).
+**`typeChecker: 'tsrs'`** runs the same check with tsrs, a pre-1.0 Rust port of TypeScript 7, after `npm install -D tsrs`. On a 5,000-component app it reported a planted error in 1.02 s against `tsgo`'s 1.36 s; on a small app there's nothing to gain. No package for Intel Macs. See [Checking with tsrs](type-checking#checking-with-tsrs).
 
 **`fileReplacements`** is for environment files. Pick the list by Vite's `mode`, the way angular.json picks it by configuration:
 
