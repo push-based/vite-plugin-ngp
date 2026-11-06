@@ -52,9 +52,10 @@ export interface NgpPluginOptions {
    */
   tsconfig?: string;
   /**
-   * Entry modules, relative to Vite's root. Defaults to `src/main.ts`, plus `src/main.server.ts`
-   * when it exists. Under Vitest it defaults to none: the analyzer reads each spec, and what it
-   * imports, when Vitest asks for it.
+   * Entry modules, relative to Vite's root. Defaults to `src/main.ts`, `src/main.server.ts` and
+   * the `ssr` entry when one is named, each only when it exists. Setting it replaces that default,
+   * so list `src/main.ts` too. Under Vitest it defaults to none: the analyzer reads each spec, and
+   * what it imports, when Vitest asks for it.
    */
   entries?: string[];
   /**
@@ -602,9 +603,14 @@ function compilerPlugin(
 
     configResolved(resolved) {
       config = resolved;
-      entries = (options.entries ?? (testing ? [] : ['src/main.ts', 'src/main.server.ts']))
-        .map((e) => path.resolve(config.root, e))
-        .filter((e) => options.entries || fs.existsSync(e));
+      // The default names the server entry too, so a custom `ssr.entry` gets its polyfills and
+      // i18n prelude without the app having to restate `src/main.ts` in `entries`.
+      if (options.entries) {
+        entries = options.entries.map((e) => path.resolve(config.root, e));
+      } else {
+        const defaults = testing ? [] : ['src/main.ts', 'src/main.server.ts', ...(ssrEntry ? [ssrEntry] : [])];
+        entries = [...new Set(defaults.map((e) => path.resolve(config.root, e)))].filter((e) => fs.existsSync(e));
+      }
       for (const {replace, with: replacement} of options.fileReplacements ?? []) {
         const from = path.resolve(config.root, replace);
         const to = path.resolve(config.root, replacement);
