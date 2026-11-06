@@ -241,6 +241,10 @@ function compilerPlugin(
   if (typeChecker !== 'tsgo' && typeChecker !== 'tsrs') {
     throw new Error(`[vite-plugin-ngp] typeChecker must be 'tsgo' or 'tsrs', not ${JSON.stringify(typeChecker)}`);
   }
+  const engine = options.engine ?? 'native';
+  if (engine !== 'native' && engine !== 'wasm') {
+    throw new Error(`[vite-plugin-ngp] engine must be 'native' or 'wasm', not ${JSON.stringify(engine)}`);
+  }
   let checker: TypeChecker | null = null;
   let devCheck: ReturnType<typeof startDevTypeCheck> | null = null;
   /** Requests and compiles in flight: the first type-check waits until there are none. */
@@ -365,7 +369,7 @@ function compilerPlugin(
           : await writeEntryTsconfig({tsconfig, entries, outDir: path.join(config.cacheDir, 'vite-plugin-ngp')});
       return NgpCompiler.create({
         toolchainDir,
-        engine: options.engine ?? 'native',
+        engine,
         tsconfig,
         analyzerTsconfig,
         enableHmr: hmr && consumer === 'client',
