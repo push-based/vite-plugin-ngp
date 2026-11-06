@@ -16,8 +16,11 @@ const repo = path.resolve(here, '../../..');
 const fixture = path.join(here, 'fixtures/file-changes');
 const toolchainDir = process.env.NGP_TOOLCHAIN ?? path.join(repo, 'toolchain/out');
 
-/** Compiles `code` as the fixture app's `greeting.ts`, and returns what ngp reported about it. */
-async function diagnose(code) {
+/**
+ * Compiles `code` as the fixture app's `greeting.ts`, with `angularCompilerOptions` added to the
+ * fixture's tsconfig, and returns what ngp reported about it.
+ */
+async function diagnose(code, angularCompilerOptions = {}) {
   // realpath: on macOS the temp dir is behind a /var -> /private/var symlink, and the analyzer
   // reports real paths.
   const root = realpathSync(await fs.mkdtemp(path.join(os.tmpdir(), 'vite-plugin-ngp-diagnostics-')));
@@ -27,17 +30,20 @@ async function diagnose(code) {
   const file = path.join(root, 'src/app/greeting.ts');
   await fs.writeFile(file, code);
   const tsconfig = path.join(root, 'tsconfig.json');
-  const compiler = await NgpCompiler.create({toolchainDir, engine: 'native', tsconfig, analyzerTsconfig: tsconfig, enableHmr: false});
+  const config = JSON.parse(await fs.readFile(tsconfig, 'utf8'));
+  config.angularCompilerOptions = {...config.angularCompilerOptions, ...angularCompilerOptions};
+  await fs.writeFile(tsconfig, JSON.stringify(config));
+  let compiler;
   try {
+    compiler = await NgpCompiler.create({toolchainDir, engine: 'native', tsconfig, analyzerTsconfig: tsconfig, enableHmr: false});
     return (await compiler.transform(file, code))?.diagnostics ?? [];
   } finally {
-    compiler.close();
+    compiler?.close();
     await fs.rm(root, {recursive: true, force: true});
   }
 }
 
-test('reports Angular\'s extended diagnostics as warnings, each naming its code once', async () => {
-  const diagnostics = await diagnose(`import {Component, signal} from '@angular/core';
+const uninvokedSignal = `import {Component, signal} from '@angular/core';
 
 @Component({
   selector: 'app-greeting',
@@ -46,7 +52,10 @@ test('reports Angular\'s extended diagnostics as warnings, each naming its code 
 export class Greeting {
   count = signal(0);
 }
-`);
+`;
+
+test('reports Angular\'s extended diagnostics as warnings, each naming its code once', async () => {
+  const diagnostics = await diagnose(uninvokedSignal);
   // NG8109: an interpolated signal that isn't invoked. NG8119: a number bound to a CSS length.
   assert.deepEqual(diagnostics.map((d) => d.code).sort(), [8109, 8119]);
   for (const d of diagnostics) {
@@ -69,4 +78,19 @@ export class Greeting {
 }
 `);
   assert.deepEqual(diagnostics, []);
+});
+
+test('angularCompilerOptions.extendedDiagnostics sets the severity, as under ng build', async () => {
+  const diagnostics = await diagnose(uninvokedSignal, {
+    extendedDiagnostics: {defaultCategory: 'error', checks: {numericCssPropertyRequiresUnit: 'suppress'}},
+  });
+  // ts.DiagnosticCategory.Error for NG8109, and NG8119 is gone.
+  assert.deepEqual(diagnostics.map((d) => [d.code, d.category]), [[8109, 1]]);
+});
+
+test('a mistyped extendedDiagnostics check fails at startup instead of silently turning them all off', async () => {
+  await assert.rejects(
+    diagnose(uninvokedSignal, {extendedDiagnostics: {checks: {interpolatedSignalNotInvokd: 'error'}}}),
+    /NG\d+: Angular compiler option "extendedDiagnostics\.checks" has an unknown check: "interpolatedSignalNotInvokd"/,
+  );
 });

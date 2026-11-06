@@ -60,7 +60,7 @@ They're warnings, so they don't fail `vite build`. Your tsconfig's `angularCompi
 }
 ```
 
-An extended diagnostic set to `error` fails the build like any other compile error.
+An extended diagnostic set to `error` fails the build like any other compile error. The checks need `strictTemplates`, which is on unless you set it to `false`: without it only NG8113 runs, as under `ng build`. A check name or category that doesn't exist, or `extendedDiagnostics` next to `strictTemplates: false`, fails the dev server and the build at startup with Angular's own message, where ngp on its own would have turned every extended check off without a word.
 
 ## Checking with tsrs
 

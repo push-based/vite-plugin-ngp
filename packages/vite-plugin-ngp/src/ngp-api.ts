@@ -72,6 +72,13 @@ export interface HybridCompiler {
    * has no components or directives to check. Cached in `fileCache`. Optimize mode only.
    */
   getTcbForFile(filePath: string): string | null;
+  /**
+   * What's wrong with the tsconfig's `angularCompilerOptions`, found when the compiler is built
+   * and never part of `processFile`'s diagnostics: an `extendedDiagnostics` check or category
+   * that doesn't exist, or `extendedDiagnostics` next to `strictTemplates: false`. With any of
+   * these ngp keeps compiling but runs no extended diagnostic at all, where ngtsc stops.
+   */
+  readonly optionDiagnostics: readonly {code: number; category: number; messageText: string}[];
 }
 
 export interface HybridCompilerOptions {

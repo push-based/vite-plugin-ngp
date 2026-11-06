@@ -15,7 +15,7 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 
 ### Type-checking
 
-- ngp now runs Angular's extended diagnostics, the NG81xx template checks `ng build` reports, so an uninvoked signal in an interpolation or a unitless CSS length is a warning in your terminal while the module compiles. They come out of the compile, not the type-check pass, so you get them with `typeCheck: false` too, and your tsconfig's `angularCompilerOptions.extendedDiagnostics` decides their severity. [Type-checking](type-checking#angulars-extended-diagnostics)
+- ngp now runs Angular's extended diagnostics, the NG81xx template checks `ng build` reports, so an uninvoked signal in an interpolation or a unitless CSS length is a warning in your terminal while the module compiles. They come out of the compile, not the type-check pass, so you get them with `typeCheck: false` too, and your tsconfig's `angularCompilerOptions.extendedDiagnostics` decides their severity. A check name or category that doesn't exist fails startup with Angular's message, instead of turning every extended check off in silence. [Type-checking](type-checking#angulars-extended-diagnostics)
 
 ### Dev server
 

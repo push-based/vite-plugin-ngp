@@ -86,7 +86,7 @@ Each entry records one choice: what we decided, why, what it costs, and when to 
 
 *16 October 2026, moved to 22.3.0-next.4 on 6 November 2026*
 
-**Decision.** Every `@angular/*` dependency is pinned to the exact release built from the Angular commit ngp is built from. Today that's `22.3.0-next.4`, commit `b355f62`; [toolchain/versions.env](../toolchain/versions.env) holds both, and nothing in the repo may name a different Angular version.
+**Decision.** Every `@angular/*` dependency is pinned to the exact release built from the Angular commit ngp is built from. Today that's `22.3.0-next.4`, commit `b355f62`; [toolchain/versions.env](../toolchain/versions.env) holds both, and nothing that describes the current setup may name a different Angular version. A measured number keeps the version it was measured on, and says so, until it's measured again.
 
 **Why.** ngp's backend imports compiler-cli's private `hybrid_analysis` API, which has to come from the same commit.
 

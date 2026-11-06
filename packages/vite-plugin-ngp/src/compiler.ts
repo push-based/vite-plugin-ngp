@@ -98,6 +98,13 @@ export class NgpCompiler {
       i18nUseExternalIds: ngOptions['i18nUseExternalIds'] as boolean | undefined,
     };
     const hybrid = new api.HybridCompiler(analyzer, hybridOptions);
+    // A mistyped `extendedDiagnostics` check or category, or `extendedDiagnostics` next to
+    // `strictTemplates: false`. ngc reports these and compiles nothing; ngp compiles on but turns
+    // every extended diagnostic off, which would hide the lot without a word. Fail as ngc does.
+    if (hybrid.optionDiagnostics.length > 0) {
+      analyzer.close();
+      throw new Error(hybrid.optionDiagnostics.map((d) => `NG${d.code}: ${d.messageText}`).join('\n\n'));
+    }
     const typeCheckHybrid = new api.HybridCompiler(analyzer, {...hybridOptions, enableHmr: false, preserveWhitespaces: true});
     const replacements = options.fileReplacements ?? new Map<string, string>();
     const compiler = new NgpCompiler(analyzer, hybrid, typeCheckHybrid, rootDir, new Set(replacements.keys()));
