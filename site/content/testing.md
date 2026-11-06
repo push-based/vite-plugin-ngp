@@ -1,15 +1,15 @@
 ---
 title: Testing with Vitest
-description: Run Angular component and service specs with TestBed under Vitest, in Node on the server platform's DOM, compiled AOT by vite-plugin-ngp one spec and its imports at a time.
+description: Run Angular TestBed specs under Vitest, compiled AOT by vite-plugin-ngp one spec and its imports at a time, in Node on the server platform's DOM, on jsdom, or in a real browser.
 ---
 
 # Testing with Vitest
 
-vite-plugin-ngp runs your Angular specs under Vitest with TestBed. It compiles them ahead of time with ngp, the same way it compiles your app in the dev server. A run compiles only the specs you asked for and what they import: run one spec, and ngp compiles that spec's components, not the whole app. Specs run in Node on Domino, the DOM Angular renders with on the server, so a component that passes also renders on the server. Setup is the plugin in `vitest.config.ts` plus one setup file.
+vite-plugin-ngp runs your Angular specs under Vitest with TestBed. It compiles them ahead of time with ngp, the same way it compiles your app in the dev server. A run compiles only the specs you asked for and what they import: run one spec, and ngp compiles that spec's components, not the whole app. Specs run one of three ways: in Node on Domino, the DOM Angular renders with on the server, which is the default here; on jsdom; or in a real Chromium through Vitest's browser mode. Setup is the plugin in `vitest.config.ts` plus one setup file per way, and the playground runs its specs all three ways.
 
-This page is for someone who already builds an app with the plugin and wants to test it. It covers the setup, what the plugin changes when Vitest runs it, and what hasn't been tried yet.
+This page is for someone who already builds an app with the plugin and wants to test it. It covers the three setups, which to pick, what the plugin changes when Vitest runs it, and what hasn't been tried yet.
 
-## Setup
+## Setup: Node on the server platform
 
 Install Vitest. No DOM package: the specs run in Node, on the DOM Angular renders with on the server. The repo's playground uses this version:
 
@@ -71,7 +71,7 @@ An app that renders on the server runs every component twice: once in Node on Do
 
 It's also faster. Vitest builds a jsdom window per test file, and that was most of a warm run. On an M2 Max, measured on 6 November 2026, the playground's 11 tests take 0.58–0.61 s warm on Node, against 1.1–1.3 s on jsdom measured with the earlier setup.
 
-An app that never renders on the server loses nothing by testing this way, but it can keep jsdom: [Using jsdom instead](testing#using-jsdom-instead) has that setup.
+An app that never renders on the server loses nothing by testing this way, but it can keep jsdom, or go to a real browser: [Setup: jsdom](testing#setup-jsdom) and [Setup: browser mode](testing#setup-browser-mode) have those, and [Which to pick](testing#which-to-pick) compares them.
 
 ## Writing specs
 
@@ -105,20 +105,20 @@ await harness.navigateByUrl('/router/signals');
 
 TestBed overrides work too. `TestBed.overrideComponent(Rating, {set: {template: '...'}})` recompiles that one component with the JIT compiler, which `@angular/core/testing` always loads. ngp emits the class metadata that needs, in `ɵsetClassMetadata` calls, and they run because `ngDevMode` stays on in tests.
 
-The playground's specs are in its `src/` folder, next to the files they test: a component spec, a service spec and a routed spec, 11 tests in all.
+The playground's specs are in its `src/` folder, next to the files they test: a component spec, a service spec and a routed spec, 11 tests in all. Its three setup files are in `src/testing/`, one per project.
 
 ## What the plugin does under Vitest
 
-The plugin knows Vitest is running from the `VITEST` environment variable, and changes five things from how it works in the dev server.
+The plugin knows Vitest is running from the `VITEST` environment variable, and changes five things from how it works in the dev server. In browser mode, where Vite serves the specs to a browser, only the first, third and fifth apply: Angular's libraries are pre-bundled by Vite's dependency optimizer and linked there, as in the dev server.
 
 **Specs compile on demand.** In the dev server, ngp's analyzer starts from `src/main.ts`. Under Vitest it starts from nothing. Vitest asks for a spec, the plugin compiles it, and the analyzer follows that spec's imports. So a run filtered to one file compiles only that file's dependency tree. To see it, set `DEBUG=vite-plugin-ngp`:
 
 ```bash
-DEBUG=vite-plugin-ngp pnpm vitest run src/app/pages/components/rating.spec.ts
+DEBUG=vite-plugin-ngp pnpm vitest run --project server src/app/pages/components/rating.spec.ts
 ```
 
 ```text
-vite-plugin-ngp unchanged src/test-setup.ts (2.2 ms)
+vite-plugin-ngp unchanged src/testing/server.ts (2.2 ms)
 vite-plugin-ngp compiled src/app/pages/components/rating.spec.ts (20.3 ms)
 vite-plugin-ngp compiled src/app/pages/components/rating.ts (15.4 ms)
 vite-plugin-ngp compiled src/app/ui/icon.ts (2.5 ms)
@@ -130,7 +130,7 @@ That's 3 of the playground's 29 modules. All three specs together load 10. The r
 
 **Libraries are cached, your code isn't.** Vitest 5 caches transformed modules on disk, keyed by each file's own content. That's wrong for a component: its compiled code also depends on its template, its styles and the components it imports, so a template edit would come back stale. The plugin keeps your app's `.ts` files out of that cache. Linked libraries stay in it, and linking is the slow part. On an M2 Max, measured on 6 November 2026, the playground's 11 tests take 1.5 s with an empty cache, and 0.58–0.61 s after that.
 
-**No HMR, no SSR.** Compiled components carry no HMR code, and the `ssr` option is ignored. `ngDevMode` stays on, as in the dev server, and `ngJitMode` is `false`. `ngServerMode` follows Vitest's environment: `true` under `node`, where Vitest runs specs in a server environment, and undefined under jsdom, which Vitest treats as a client. So on the server platform Angular takes the same code paths it takes in `main.server.ts`.
+**No HMR, no SSR.** Compiled components carry no HMR code, and the `ssr` option is ignored. `ngDevMode` stays on, as in the dev server, and `ngJitMode` is `false`. `ngServerMode` follows Vitest's environment: `true` under `node`, where Vitest runs specs in a server environment, undefined under jsdom, which Vitest treats as a client, and `false` in browser mode. So on the server platform Angular takes the same code paths it takes in `main.server.ts`, and in a browser the ones it takes in `main.ts`.
 
 **Watch mode follows edits Angular cares about.** `vitest` without `run` reruns the specs that depend on what you saved. Edit a template, and the plugin tells Vitest its component changed, so that component's specs rerun with the new template. Edit a child component, and the parents that use it are compiled again too, so a renamed input fails the parent's spec with `NG8002: Can't bind to 'eyebrow'` instead of passing on stale code.
 
@@ -144,9 +144,9 @@ Domino is the DOM `@angular/platform-server` renders with, and it implements wha
 
 `fixture.nativeElement.textContent`, `querySelector`, attributes, `classList`, `dispatchEvent` and `click()` work as in the browser.
 
-## Using jsdom instead
+## Setup: jsdom
 
-For an app that only runs in the browser, jsdom is still an option, and it was the setup documented before 6 November 2026. Install it, set `environment: 'jsdom'`, and start TestBed on the browser platform:
+For an app that only runs in the browser, jsdom gives it a browser-shaped DOM in Node, and it was the setup documented before 6 November 2026. Install it, set `environment: 'jsdom'`, and start TestBed on the browser platform:
 
 ```bash
 pnpm add -D jsdom@30.1.2
@@ -162,11 +162,50 @@ getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting())
 afterEach(() => getTestBed().resetTestingModule());
 ```
 
-Everything else on this page applies the same way. The playground's three specs passed on both setups.
+Everything else on this page applies the same way.
+
+## Setup: browser mode
+
+Vitest's browser mode runs each spec file in a real browser that Playwright drives, so the DOM is Chromium's, with layout, `getComputedStyle` and every event a user can send. Install the provider and Playwright, and download a browser once:
+
+```bash
+pnpm add -D @vitest/browser-playwright@5.0.4 playwright
+npx playwright install chromium
+```
+
+In `vitest.config.ts`, turn the browser on instead of naming an environment:
+
+```ts
+import {playwright} from '@vitest/browser-playwright';
+
+export default defineConfig({
+  plugins: [ngp()],
+  test: {
+    setupFiles: ['src/test-setup.ts'],
+    browser: {enabled: true, headless: true, provider: playwright(), instances: [{browser: 'chromium'}]},
+  },
+});
+```
+
+The setup file is the jsdom one: `BrowserTestingModule` and `platformBrowserTesting()`, on the browser's own DOM. Nothing in the specs changes. In this mode the plugin treats the run as a browser: Angular's libraries come pre-bundled and linked through Vite's dependency optimizer, as in the dev server, and `ngServerMode` is `false`.
+
+On CI, install the browser before the tests. The repo's workflow runs `npx playwright install --with-deps chromium` on Ubuntu.
+
+## Which to pick
+
+The playground runs its 11 tests all three ways, with a [Vitest project](https://vitest.dev/guide/projects) per setup in one `vitest.config.ts`, so `vitest run` covers all three and `vitest run --project browser` one of them. Measured on an M2 Max on 6 November 2026, warm, as the median of three `vitest run --project` runs:
+
+| Setup | DOM | Warm run | Catches |
+|---|---|---|---|
+| Node on the server platform | Domino | 0.42 s | Code that can't render on the server |
+| jsdom | jsdom | 0.78 s | Most browser DOM use, no layout |
+| Browser mode | Chromium | 0.85 s | Everything a browser does, layout included |
+
+Pick the server platform if your app renders on the server, or might: it's the fastest, and it fails the way the server would. Pick browser mode when a spec needs layout, real focus handling or a browser-only API; it costs a browser download and about a second of startup per run. jsdom sits between the two, and is the right choice for a browser-only app whose specs already pass there. Nothing stops you running two or all three, as the playground does: the specs are the same files.
 
 ## Limits
 
-- **Only Node with Domino and jsdom have been tried.** happy-dom should work like jsdom. Vitest's browser mode hasn't been tried.
+- **Browser mode has been tried on Chromium only.** Firefox and WebKit should work the same way through Playwright, and happy-dom like jsdom, but nobody has run them.
 - **No `fakeAsync`.** It needs `zone.js`, and the setup above is zoneless. Use Vitest's fake timers and `await fixture.whenStable()` instead.
 - **No type-checking.** Vitest strips types without checking them, as Vite does. Template errors ngp finds, like the `NG8002` above, do fail the spec file, but type errors elsewhere in a spec don't. Run `tsc` on your specs separately.
 - **Your code is compiled again on every run.** Keeping app modules out of Vitest's cache is what makes the cache safe, and it costs time in proportion to what a run imports. In the playground that's 2–20 ms per module. On a large app, a full run pays it for every component.

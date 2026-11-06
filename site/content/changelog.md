@@ -12,6 +12,7 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 ### Testing
 
 - The documented Vitest setup now runs specs in Node on the server platform: `environment: 'node'`, `@angular/platform-server/init` and `ServerTestingModule`. The DOM is Domino, the one Angular renders with on the server, so a component that passes its spec also renders on the server, and a warm run of the playground's 11 tests went from 1.1–1.3 s to 0.58–0.61 s without jsdom's window setup. Domino is smaller than jsdom: spread `querySelectorAll` results with `Array.from`, and dispatch `new Event(type)` rather than `new MouseEvent(type)`. jsdom is still documented as the alternative. [Testing with Vitest](testing#why-the-server-platform)
+- Vitest's browser mode works too, on headless Chromium through `@vitest/browser-playwright`, with the same specs and the jsdom setup file. The playground now runs its specs all three ways, as three Vitest projects, and the page compares them. [Testing with Vitest](testing#which-to-pick)
 
 ### Angular
 

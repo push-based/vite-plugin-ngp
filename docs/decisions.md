@@ -763,3 +763,15 @@ A disk cache of the linker's output, keyed by file content and Angular version, 
 **Cost.** `ServerTestingModule` imports `@angular/platform-browser-dynamic/testing`, which `@angular/platform-server` doesn't declare, so an app without it installs one more package, and a deprecated one: npm says to use `@angular/platform-browser` instead, while Angular's own `ServerTestingModule` still imports it. Domino is a smaller DOM: `querySelectorAll` with a plain tag selector returns a non-iterable collection, `new MouseEvent(type)` loses its type, and there's no layout. Two of the playground's eleven tests hit the first two and were changed to `Array.from` and `new Event`. Both forms also work on jsdom. The [testing page](../site/content/testing.md) lists the gaps.
 
 **Revisit when** Vitest's browser mode is tried, which would test the browser half for real, or when Angular's platform-server replaces Domino.
+
+## 64. The playground runs its specs three ways: server platform, jsdom and browser mode
+
+*6 November 2026*
+
+**Decision.** `playground/vitest.config.ts` defines three Vitest projects over the same spec files: `server` (Node, `platformServerTesting`, [decision 63](#63-specs-run-in-node-on-the-server-platform-not-on-jsdom)), `jsdom` (`platformBrowserTesting`) and `browser` (Vitest browser mode on headless Chromium through `@vitest/browser-playwright`). Each has its own setup file in `src/testing/`. `pnpm test` runs all three, and CI installs Chromium with `npx playwright install --with-deps chromium` first. The plugin's filtered-run test passes `--project server`. The testing page documents each setup and compares them.
+
+**Why.** Users will arrive with specs written for one of the three, and the plugin should work for all of them without a mode of its own. It does: browser mode needed no plugin change either. Vite serves the specs to Chromium through the client environment, where `ngServerMode` is `false` and the dependency optimizer pre-bundles and links Angular's libraries as in the dev server. Running all three in CI is what makes "supported" mean something: a plugin change that breaks one of them fails the build. Warm, the playground's 11 tests take 0.42 s on the server platform, 0.78 s on jsdom and 0.85 s in Chromium on an M2 Max.
+
+**Cost.** The playground installs jsdom, Playwright and the provider, and CI downloads Chromium on every run, about 100 MB. Two specs had to avoid Domino's gaps to pass on all three. Only Chromium is run; Firefox and WebKit go untested.
+
+**Revisit when** the three setups diverge in what the plugin has to do, which would be the time for a plugin option, or when CI time for the browser download becomes a complaint.
