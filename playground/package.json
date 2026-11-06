@@ -24,11 +24,11 @@
   },
   "devDependencies": {
     "@angular/compiler-cli": "22.3.0-next.4",
-    "jsdom": "30.1.2",
+    "@angular/platform-browser-dynamic": "22.3.0-next.4",
+    "@push-based/vite-plugin-ngp": "workspace:*",
     "sass": "1.105.2",
     "typescript": "6.0.3",
     "vite": "8.3.4",
-    "@push-based/vite-plugin-ngp": "workspace:*",
     "vitest": "5.0.4"
   }
 }

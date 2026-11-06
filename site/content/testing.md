@@ -1,20 +1,26 @@
 ---
 title: Testing with Vitest
-description: Run Angular component and service specs with TestBed under Vitest, compiled AOT by vite-plugin-ngp, one spec and its imports at a time.
+description: Run Angular component and service specs with TestBed under Vitest, in Node on the server platform's DOM, compiled AOT by vite-plugin-ngp one spec and its imports at a time.
 ---
 
 # Testing with Vitest
 
-vite-plugin-ngp runs your Angular specs under Vitest with TestBed. It compiles them ahead of time with ngp, the same way it compiles your app in the dev server. A run compiles only the specs you asked for and what they import: run one spec, and ngp compiles that spec's components, not the whole app. Setup is the plugin in `vitest.config.ts` plus one setup file.
+vite-plugin-ngp runs your Angular specs under Vitest with TestBed. It compiles them ahead of time with ngp, the same way it compiles your app in the dev server. A run compiles only the specs you asked for and what they import: run one spec, and ngp compiles that spec's components, not the whole app. Specs run in Node on Domino, the DOM Angular renders with on the server, so a component that passes also renders on the server. Setup is the plugin in `vitest.config.ts` plus one setup file.
 
 This page is for someone who already builds an app with the plugin and wants to test it. It covers the setup, what the plugin changes when Vitest runs it, and what hasn't been tried yet.
 
 ## Setup
 
-Install Vitest and a DOM. The repo's playground uses these versions:
+Install Vitest. No DOM package: the specs run in Node, on the DOM Angular renders with on the server. The repo's playground uses this version:
 
 ```bash
-pnpm add -D vitest@5.0.4 jsdom@30.1.2
+pnpm add -D vitest@5.0.4
+```
+
+`ServerTestingModule` imports `@angular/platform-browser-dynamic/testing`, which `@angular/platform-server` doesn't list as a dependency. An app that renders on the server has it installed already; otherwise add it at your Angular version. npm prints a deprecation notice for it, which is Angular's: the package is deprecated for apps, and `ServerTestingModule` still imports it.
+
+```bash
+pnpm add -D @angular/platform-browser-dynamic@22.3.0-next.4
 ```
 
 `vitest.config.ts`, next to your `vite.config.ts`:
@@ -26,7 +32,7 @@ import {ngp} from '@push-based/vite-plugin-ngp';
 export default defineConfig({
   plugins: [ngp()],
   test: {
-    environment: 'jsdom',
+    environment: 'node',
     setupFiles: ['src/test-setup.ts'],
   },
 });
@@ -34,17 +40,20 @@ export default defineConfig({
 
 Leave out `ssr`: the plugin ignores it under Vitest anyway.
 
-`src/test-setup.ts` starts TestBed once per test file, and resets it after every test:
+`src/test-setup.ts` installs Domino's DOM as globals, starts TestBed on the server platform once per test file, and resets it after every test:
 
 ```ts
+import '@angular/platform-server/init';
 import {getTestBed} from '@angular/core/testing';
-import {BrowserTestingModule, platformBrowserTesting} from '@angular/platform-browser/testing';
+import {platformServerTesting, ServerTestingModule} from '@angular/platform-server/testing';
 import {afterEach} from 'vitest';
 
-getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
+getTestBed().initTestEnvironment(ServerTestingModule, platformServerTesting());
 
 afterEach(() => getTestBed().resetTestingModule());
 ```
+
+The first import matters. `@angular/platform-server/init` copies Domino's `Element`, `Node`, `Event` and the rest onto `globalThis`, the same way the server entry gets them, so a spec can write `new Event('click')` and `instanceof HTMLElement`. `document` and `window` stay undefined: each TestBed gets its own document, as each server render does.
 
 Don't skip the `afterEach`. Angular would register that reset itself, but only when `afterEach` is a global, and Vitest's globals are off by default. Without it, every test in a file shares one TestBed, and the second `configureTestingModule` fails with "the test module has already been instantiated".
 
@@ -56,9 +65,17 @@ If you keep a `tsconfig.spec.json`, the plugin reads your Angular compiler optio
 "test": "vitest run"
 ```
 
+### Why the server platform
+
+An app that renders on the server runs every component twice: once in Node on Domino, once in the browser. A spec on jsdom checks the browser half only. It passes on a component that reads `window` in its constructor, and the first `vite build` with `ssr: true` finds out. On the server platform the same spec fails where the component does, with the same error the server would give, so a green run means the component renders on both sides. That's the trade: Domino is a smaller DOM than jsdom, and the gaps below are the price.
+
+It's also faster. Vitest builds a jsdom window per test file, and that was most of a warm run. On an M2 Max, measured on 6 November 2026, the playground's 11 tests take 0.58–0.61 s warm on Node, against 1.1–1.3 s on jsdom measured with the earlier setup.
+
+An app that never renders on the server loses nothing by testing this way, but it can keep jsdom: [Using jsdom instead](testing#using-jsdom-instead) has that setup.
+
 ## Writing specs
 
-Specs are ordinary TestBed specs. A component with a signal input and a two-way `model()`, from the playground:
+Specs are ordinary TestBed specs. The DOM is Domino's: query it, read it, click it and dispatch events on it as in a browser, with the few gaps in [Domino's gaps](testing#dominos-gaps). A component with a signal input and a two-way `model()`, from the playground:
 
 ```ts
 @Component({
@@ -111,15 +128,45 @@ That's 3 of the playground's 29 modules. All three specs together load 10. The r
 
 **Angular libraries get linked.** Vitest leaves `node_modules` to Node, which would load Angular's packages partially compiled, and they'd need the JIT compiler. The plugin adds every `@angular/*` package to `test.server.deps.inline`, plus every package in `dependencies` or `devDependencies` that depends on `@angular/core`. Vitest then sends them through Vite, where the linker runs. That also keeps one copy of `@angular/core`.
 
-**Libraries are cached, your code isn't.** Vitest 5 caches transformed modules on disk, keyed by each file's own content. That's wrong for a component: its compiled code also depends on its template, its styles and the components it imports, so a template edit would come back stale. The plugin keeps your app's `.ts` files out of that cache. Linked libraries stay in it, and linking is the slow part. On an M2 Max, the playground's 11 tests take 2.1–2.5 s with an empty cache, and 1.1–1.3 s after that.
+**Libraries are cached, your code isn't.** Vitest 5 caches transformed modules on disk, keyed by each file's own content. That's wrong for a component: its compiled code also depends on its template, its styles and the components it imports, so a template edit would come back stale. The plugin keeps your app's `.ts` files out of that cache. Linked libraries stay in it, and linking is the slow part. On an M2 Max, measured on 6 November 2026, the playground's 11 tests take 1.5 s with an empty cache, and 0.58–0.61 s after that.
 
-**No HMR, no SSR.** Compiled components carry no HMR code, and the `ssr` option is ignored. `ngDevMode` stays on, as in the dev server, and `ngJitMode` is `false`.
+**No HMR, no SSR.** Compiled components carry no HMR code, and the `ssr` option is ignored. `ngDevMode` stays on, as in the dev server, and `ngJitMode` is `false`. `ngServerMode` follows Vitest's environment: `true` under `node`, where Vitest runs specs in a server environment, and undefined under jsdom, which Vitest treats as a client. So on the server platform Angular takes the same code paths it takes in `main.server.ts`.
 
 **Watch mode follows edits Angular cares about.** `vitest` without `run` reruns the specs that depend on what you saved. Edit a template, and the plugin tells Vitest its component changed, so that component's specs rerun with the new template. Edit a child component, and the parents that use it are compiled again too, so a renamed input fails the parent's spec with `NG8002: Can't bind to 'eyebrow'` instead of passing on stale code.
 
+## Domino's gaps
+
+Domino is the DOM `@angular/platform-server` renders with, and it implements what rendering needs, not what a browser has. Three things the playground's specs ran into, with what to write instead:
+
+- **`querySelectorAll` with a plain tag or class selector returns a collection you can't spread.** Domino answers `querySelectorAll('a')` through `getElementsByTagName`, whose result has no `Symbol.iterator`; a selector with a combinator, like `'app-rating button'`, gets a real `NodeList`. `Array.from(root.querySelectorAll('a'))` works for both, and on jsdom.
+- **`new MouseEvent('mouseenter')` has no type.** Domino's `MouseEvent` constructor ignores its arguments, so the event dispatches to nobody. `new Event('mouseenter')` reaches an `(mouseenter)` listener. `element.click()` dispatches a real click.
+- **No layout, no `getComputedStyle`, no `IntersectionObserver`.** Nothing is measured on the server, so a component that needs those is a component you can't render on the server either, and the spec tells you.
+
+`fixture.nativeElement.textContent`, `querySelector`, attributes, `classList`, `dispatchEvent` and `click()` work as in the browser.
+
+## Using jsdom instead
+
+For an app that only runs in the browser, jsdom is still an option, and it was the setup documented before 6 November 2026. Install it, set `environment: 'jsdom'`, and start TestBed on the browser platform:
+
+```bash
+pnpm add -D jsdom@30.1.2
+```
+
+```ts
+import {getTestBed} from '@angular/core/testing';
+import {BrowserTestingModule, platformBrowserTesting} from '@angular/platform-browser/testing';
+import {afterEach} from 'vitest';
+
+getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
+
+afterEach(() => getTestBed().resetTestingModule());
+```
+
+Everything else on this page applies the same way. The playground's three specs passed on both setups.
+
 ## Limits
 
-- **Only jsdom has been tried.** happy-dom should work the same way. Vitest's browser mode and the `node` environment haven't been tried.
+- **Only Node with Domino and jsdom have been tried.** happy-dom should work like jsdom. Vitest's browser mode hasn't been tried.
 - **No `fakeAsync`.** It needs `zone.js`, and the setup above is zoneless. Use Vitest's fake timers and `await fixture.whenStable()` instead.
 - **No type-checking.** Vitest strips types without checking them, as Vite does. Template errors ngp finds, like the `NG8002` above, do fail the spec file, but type errors elsewhere in a spec don't. Run `tsc` on your specs separately.
 - **Your code is compiled again on every run.** Keeping app modules out of Vitest's cache is what makes the cache safe, and it costs time in proportion to what a run imports. In the playground that's 2–20 ms per module. On a large app, a full run pays it for every component.

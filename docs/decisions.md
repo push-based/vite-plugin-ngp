@@ -751,3 +751,15 @@ A disk cache of the linker's output, keyed by file content and Angular version, 
 **Why.** Since 0.2.0 the npm package carries ngp ([decision 60](decisions.md#60-ngp-ships-inside-the-plugins-package-with-a-native-engine-for-four-platforms)), so no user of the plugin needs Rust, a C compiler or `pnpm toolchain`. A page about it in the site's sidebar made the setup look harder than it is.
 
 **Cost.** Someone who wants an ngp build from another Angular commit, the one reason left to set `toolchain`, finds how to make one only from the repo. The Benchmarks page still starts from `pnpm toolchain`, because reproducing the bench means running the repo.
+
+## 63. Specs run in Node on the server platform, not on jsdom
+
+*6 November 2026*
+
+**Decision.** The documented Vitest setup, and the playground's, is `environment: 'node'` with `@angular/platform-server/init` imported first and TestBed started on `ServerTestingModule` and `platformServerTesting()`. The DOM is Domino, the one `@angular/platform-server` renders with. jsdom stays documented as the alternative for an app that never renders on the server. Replaces the jsdom setup in [decision 28](#28-the-app-writes-the-testbed-setup-file); the app still writes the setup file.
+
+**Why.** A server-rendered app runs every component on Domino first, and a spec on jsdom never does: a component that reads `window` in its constructor passes its spec and fails the first server render. On the server platform the spec fails with the server's error. Nothing in the plugin had to change: Vitest runs `node` specs in a server environment, so `configEnvironment` already defines `ngServerMode` as `true` there, as for `main.server.ts`, and `test.server.deps.inline` already links `@angular/platform-server`. It's also faster: Vitest builds a jsdom window per spec file, and dropping it took the playground's warm run from 1.1–1.3 s to 0.58–0.61 s on an M2 Max.
+
+**Cost.** `ServerTestingModule` imports `@angular/platform-browser-dynamic/testing`, which `@angular/platform-server` doesn't declare, so an app without it installs one more package, and a deprecated one: npm says to use `@angular/platform-browser` instead, while Angular's own `ServerTestingModule` still imports it. Domino is a smaller DOM: `querySelectorAll` with a plain tag selector returns a non-iterable collection, `new MouseEvent(type)` loses its type, and there's no layout. Two of the playground's eleven tests hit the first two and were changed to `Array.from` and `new Event`. Both forms also work on jsdom. The [testing page](../site/content/testing.md) lists the gaps.
+
+**Revisit when** Vitest's browser mode is tried, which would test the browser half for real, or when Angular's platform-server replaces Domino.

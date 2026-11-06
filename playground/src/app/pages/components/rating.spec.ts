@@ -13,7 +13,7 @@ class Host {
 }
 
 function stars(root: HTMLElement): HTMLButtonElement[] {
-  return [...root.querySelectorAll<HTMLButtonElement>('app-rating button')];
+  return Array.from(root.querySelectorAll<HTMLButtonElement>('app-rating button'));
 }
 
 describe('Rating', () => {
@@ -48,12 +48,12 @@ describe('Rating', () => {
     await fixture.whenStable();
     const root: HTMLElement = fixture.nativeElement;
 
-    stars(root)[2].dispatchEvent(new MouseEvent('mouseenter'));
+    stars(root)[2].dispatchEvent(new Event('mouseenter'));
     await fixture.whenStable();
     expect(stars(root).filter((b) => b.classList.contains('filled'))).toHaveLength(3);
     expect(fixture.componentInstance.score()).toBe(2);
 
-    stars(root)[2].dispatchEvent(new MouseEvent('mouseleave'));
+    stars(root)[2].dispatchEvent(new Event('mouseleave'));
     await fixture.whenStable();
     expect(stars(root).filter((b) => b.classList.contains('filled'))).toHaveLength(2);
   });
