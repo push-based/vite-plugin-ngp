@@ -38,7 +38,7 @@ vite-plugin-ngp is a first version on top of a prototype compiler. This page say
 
 ## Where it's weakest
 
-- **ngp is a prototype, and the plugin uses it as one.** ngp's API isn't public, and the plugin reaches below it in two places to skip work it doesn't need. Any Angular commit can break that, which is why every Angular package is pinned to exactly `22.3.0-next.2`.
+- **ngp is a prototype, and the plugin uses it as one.** ngp's API isn't public, and the plugin reaches below it in two places to skip work it doesn't need. Any Angular commit can break that, which is why every Angular package is pinned to exactly `22.3.0-next.4`.
 - **The ngp in the package is an unofficial build.** `@push-based/vite-plugin-ngp` carries ngp built from Angular's source, not a release from the Angular team, with native engines for macOS and for glibc Linux on x64 and arm64. Everywhere else, Alpine included, it needs `engine: 'wasm'`, which analyzes up to twice as slowly. Each plugin version carries one ngp build, so moving to another Angular commit means a new plugin release.
 - **File changes are tested on one small app.** Adding, renaming and deleting components and templates is covered by a test on a three-component app, not on a large one. Deleting a component that's still used gives Angular's "is not a known element" error, which names the element, not the missing file. A missing `styleUrl` file isn't reported at all.
 - **Type-checking is whole-program.** Every check runs TypeScript 7 over the whole app. That takes 100–250 ms in the dev server on the repo's playground. On a 5,000-component app, an error shows up 1.45 s after the edit, a little sooner than under `ng serve`. See [Type-checking](type-checking#where-its-weak).

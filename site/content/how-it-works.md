@@ -63,7 +63,7 @@ In the dev server, each stylesheet is a `<link>` the runtime adds, and an edit r
 
 ## Type-checking
 
-Compiling a module doesn't check its types. Separately, after startup and after each edit, the plugin asks ngp for a type-check block per component file, and runs TypeScript 7 over your app and those blocks in another process. It maps errors in a block back to your template. [Type-checking](type-checking) has the details.
+Compiling a module doesn't check its types. Separately, after startup and after each edit, the plugin asks ngp for a type-check block per component file, and runs TypeScript 7 over your app and those blocks in another process. It maps errors in a block back to your template. Angular's extended diagnostics, the NG81xx template checks, do come out of the compile itself, as warnings. [Type-checking](type-checking) has the details.
 
 ## Linking libraries
 

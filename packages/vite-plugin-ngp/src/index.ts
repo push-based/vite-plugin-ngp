@@ -791,7 +791,9 @@ function compilerPlugin(
           return null;
         }
         for (const d of result.diagnostics) {
-          const log = {message: `NG${d.code}: ${d.messageText}`, id: d.filePath ?? file, pos: d.span?.start};
+          // Extended diagnostics (NG81xx) already name their code in the message; the rest don't.
+          const prefixed = d.messageText.startsWith(`NG${d.code}:`) ? d.messageText : `NG${d.code}: ${d.messageText}`;
+          const log = {message: prefixed, id: d.filePath ?? file, pos: d.span?.start};
           // ts.DiagnosticCategory.Error
           if (d.category === 1) {
             this.error(log);

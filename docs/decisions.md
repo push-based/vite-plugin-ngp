@@ -82,15 +82,15 @@ Each entry records one choice: what we decided, why, what it costs, and when to 
 
 **Cost.** Projects still on Vite 7 or earlier can't use the plugin.
 
-## 8. Pin Angular to exactly 22.3.0-next.2
+## 8. Pin Angular to one exact prerelease
 
-*16 October 2026*
+*16 October 2026, moved to 22.3.0-next.4 on 6 November 2026*
 
-**Decision.** Every `@angular/*` dependency is pinned to `22.3.0-next.2`, the release built from ngp's commit `92e5aa8`.
+**Decision.** Every `@angular/*` dependency is pinned to the exact release built from the Angular commit ngp is built from. Today that's `22.3.0-next.4`, commit `b355f62`; [toolchain/versions.env](../toolchain/versions.env) holds both, and nothing that describes the current setup may name a different Angular version. A measured number keeps the version it was measured on, and says so, until it's measured again.
 
 **Why.** ngp's backend imports compiler-cli's private `hybrid_analysis` API, which has to come from the same commit.
 
-**Cost.** Moving to a newer Angular means rebuilding ngp at that commit and updating every pin together.
+**Cost.** Moving to a newer Angular means rebuilding ngp at that commit and updating every pin together. It isn't mechanical: the three weeks between `22.3.0-next.2` and `22.3.0-next.4` changed how the analyzer treats a file that comes back after a delete, which the plugin had to answer (decision 25), and gave ngp Angular's extended diagnostics, which the plugin now reports.
 
 ## 9. JIT fallback in the playground until there's a linker
 
@@ -301,6 +301,8 @@ The `ng build` row is the playground copied into a CLI project with an `angular.
 **Why.** The plugin used to ignore deletes. The analyzer keeps every file sent with `updateFileContent` in an in-memory overlay and never drops it, so after a delete it went on compiling importers against the deleted content, and Vite kept serving the importers' cached output: no error at all. `invalidateFiles` is the only call that drops the overlay. In ngp at `92e5aa8` it treats created, deleted and changed files alike, so the plugin uses it only for deletes and keeps `updateFileContent` for the rest. In the tests the analyzer's stale list did include the importers, but the plugin invalidates Vite's importers as well, so the error doesn't depend on that list being complete. Disk decides instead of the event type because on macOS, chokidar reported newly created files as `change` in the tests. The NG2008 check exists because ngp compiles a missing template to an empty one without a diagnostic, even in a fresh compiler. A deleted template would otherwise give a blank component. The reload after a failed compile is needed because the failed component isn't running in the browser, and an update sent to it changes nothing on the page.
 
 [file-changes.test.mjs](../packages/vite-plugin-ngp/test/file-changes.test.mjs) covers new components, deletes, renames, deleting a file that's still used, and new, deleted and repointed templates. It runs a real dev server and Vite's watcher, and checks against a fresh compiler. Run against the plugin before this change, four of its eight fail: the three that delete a file, and the `templateUrl` test, which points a component at a template before the file exists. Changing `templateUrl` to another file works too: the analyzer moves the component to the new template, and only edits to the new one update it. That's the case decision 23 hadn't tried. A `templateUrl` change still reloads, as decision 23 says.
+
+**Update, 6 November 2026 (Angular 22.3.0-next.4).** `updateType` is no longer ignored: `Created` and `Deleted` also make the analyzer resolve module specifiers and read the tsconfig's file list again, which `Changed` doesn't. So the plugin now sends `Created` for a file the watcher brings that it hasn't seen before. That alone isn't enough. Deleting a file drops the edge from each importer to it, so when the file comes back the analyzer reports only the file itself as stale and leaves every importer analyzed as it was, failed resolution and all: restoring a deleted component left `'app-greeting' is not a known element` on screen. The plugin remembers what the analyzer reported stale for the delete, and when the path returns it re-sends those files' content unchanged, which is the only way to ask for them to be analyzed again. Both cases are in [file-changes.test.mjs](../packages/vite-plugin-ngp/test/file-changes.test.mjs); they fail without it.
 
 **Cost.** One more private analyzer call, `invalidateFiles`, typed by hand. The NG2008 check reads the analyzer's metadata after every component compile. That cost isn't measured, but the analyzer has the metadata cached by then. The check is the plugin's, not Angular's, so its message can differ from ngc's in edge cases. Missing `styleUrl` files aren't checked.
 

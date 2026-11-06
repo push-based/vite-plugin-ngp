@@ -4,7 +4,7 @@
   "repo": "https://github.com/johannesjo/super-productivity.git",
   "homepage": "https://github.com/johannesjo/super-productivity",
   "sha": "65145cdceec75286a32215fc519b5e8e6bb89a70",
-  "angularVersion": "22.3.0-next.2",
+  "angularVersion": "22.3.0-next.4",
   "install": [
     "npm install --legacy-peer-deps --min-release-age=0 --no-audit --no-fund",
     "node ./packages/build-packages.js"

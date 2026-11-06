@@ -4,7 +4,7 @@ vite-plugin-ngp lets Vite compile Angular one module at a time, using ngp, the R
 
 This page is for whoever builds or reviews the plugin next. It covers why the plugin exists, how it works today, what it doesn't do yet, and where the design is weakest. The evidence behind each choice lives in [ng-hybrid-preprocessor-bench](https://github.com/push-based/ng-hybrid-preprocessor-bench), mainly its [Vite plugin investigation](https://github.com/push-based/ng-hybrid-preprocessor-bench/blob/main/docs/vite-plugin-investigation.md). Individual choices are logged in [decisions.md](decisions.md).
 
-Snapshot: 16 October 2026. ngp built from Angular `92e5aa8` (`22.3.0-next.2`), Vite 8.3.4, Node 26.12.0.
+Snapshot: 16 October 2026, with the Angular pin moved on 6 November 2026. ngp built from Angular `b355f62` (`22.3.0-next.4`), Vite 8.3.4, Node 26.12.0.
 
 ## Why build it
 
@@ -113,7 +113,7 @@ Verified in the [playground](../playground): `vite build` and `vite preview`, de
 
 ## Where it's weak
 
-- **ngp is a prototype, and the plugin uses it as one.** The plugin types the API by hand and reaches into `HybridCompiler.fileCache`, `analyzer.updateFileContent` and `analyzer.invalidateFiles`, below the public `updateFileContent` that runs the delta. Any Angular commit can break that. Pinning Angular to exactly `22.3.0-next.2` holds it still for now.
+- **ngp is a prototype, and the plugin uses it as one.** The plugin types the API by hand and reaches into `HybridCompiler.fileCache`, `analyzer.updateFileContent` and `analyzer.invalidateFiles`, below the public `updateFileContent` that runs the delta. Any Angular commit can break that. Pinning Angular to exactly `22.3.0-next.4` holds it still for now.
 - **It ships an unofficial ngp.** The npm package carries ngp built from Angular's source by our CI, with native engines for macOS and glibc Linux only ([decision 60](decisions.md#60-ngp-ships-inside-the-plugins-package-with-a-native-engine-for-four-platforms)). Everywhere else needs the slower wasm engine, and moving to another Angular commit means a new plugin release.
 - **File changes are tested on one small app.** The test app has three components. Nobody has added or deleted a file in a large app, deleted a whole directory, or moved files with a tool that writes them seconds apart. Deleting a component that's still used fails with ngp's "'app-greeting' is not a known element", which names the element but not the missing file; Vite's own "Failed to resolve import" would, but ngp runs first. A missing `styleUrl` file isn't checked at all.
 - **SSR runs two analyzers.** The browser and server compilers each hold their own ngp analyzer, so a dev server with SSR needs about twice the analyzer memory, and every edit is analyzed twice. One analyzer serving both would need a way to compile with and without HMR from the same state.

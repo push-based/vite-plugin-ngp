@@ -39,7 +39,10 @@ export function recordingLogger() {
  */
 export async function build(root, options, {without = [], logger} = {}) {
   const plugins = ngp({toolchain, ...options}).filter((p) => !without.includes(p.name));
-  const builder = await createBuilder({root, configFile: false, logLevel: 'silent', customLogger: logger, plugins});
+  // Its own cache: without it Vite falls back to the repo root's node_modules/.vite, which
+  // every parallel test file would then share, including the type-check tsconfig written there.
+  const cacheDir = path.join(root, '.vite');
+  const builder = await createBuilder({root, cacheDir, configFile: false, logLevel: 'silent', customLogger: logger, plugins});
   await builder.buildApp();
 }
 

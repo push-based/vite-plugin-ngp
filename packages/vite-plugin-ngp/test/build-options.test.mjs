@@ -37,6 +37,7 @@ test('fileReplacements: an edit to the replacement recompiles what uses it, in d
   const root = await copyFixture('ng-build-app', 'replacements-dev');
   const server = await createServer({
     root,
+    cacheDir: path.join(root, '.vite'),
     configFile: false,
     logLevel: 'silent',
     server: {middlewareMode: true, ws: false},
