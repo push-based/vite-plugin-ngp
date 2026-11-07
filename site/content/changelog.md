@@ -7,6 +7,12 @@ description: What changed in vite-plugin-ngp, newest first, for anyone following
 
 What changed in vite-plugin-ngp, newest first, written for people using it. Every entry links to the page that documents it. Versions on npm, with the commits in each, are in the repo's [CHANGELOG.md](https://github.com/push-based/vite-plugin-ngp/blob/main/CHANGELOG.md) and its [GitHub releases](https://github.com/push-based/vite-plugin-ngp/releases).
 
+## 7 November 2026
+
+### Configuration
+
+- An `engine` that is neither `'native'` nor `'wasm'` now fails startup with a message naming both, like a wrong `typeChecker` does. Before, any value other than `'native'` quietly loaded the single-threaded wasm analyzer, so a typo like `'natve'` made every compile slower with no error. [Configuration](configuration)
+
 ## 6 November 2026
 
 ### Angular
