@@ -84,7 +84,7 @@ The plugin defines the same globals the Angular CLI does, so the minifier can dr
 | `ngJitMode` | `false` everywhere, since the linker makes every library ahead-of-time compiled |
 | `ngDevMode` | `false` in builds |
 | `ngServerMode` | `false` in the browser, `true` in server environments |
-| `ngHmrMode` | `true` in the dev server's browser environment, `false` under Vitest |
+| `ngHmrMode` | `true` in the dev server's browser environment, `false` in builds, server environments, under Vitest and with `hmr: false` |
 | `ngI18nClosureMode` | `false` everywhere, so i18n messages compile to `$localize` calls, never Closure's `goog.getMsg` |
 
 These took the playground's bundle from 589 kB to 386 kB, and stopped production builds from logging "Angular is running in development mode".
