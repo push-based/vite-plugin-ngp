@@ -34,7 +34,7 @@ export default defineConfig({
 | Option | Type, default | What it does |
 |---|---|---|
 | `toolchain` | `string`<br>Default: the `NGP_TOOLCHAIN` variable, then the ngp build inside the package | A directory holding another ngp build, `preprocessor/` and `engines/`. Leave it unset: the package carries ngp for macOS (arm64 and x64) and Linux (x64 and arm64, glibc), and uses it when neither this nor the variable is set. You need it only to run a build of ngp you made yourself, from a different Angular commit. |
-| `engine` | `'native' \| 'wasm'`<br>Default `'native'` | Which build of ngp's analyzer to load: the native Node addon, or `'wasm'`. There's no automatic fallback: on a platform the package has no native engine for, the plugin stops and says to set `'wasm'`. |
+| `engine` | `'native' \| 'wasm'`<br>Default `'native'` | Which build of ngp's analyzer to load: the native Node addon, or `'wasm'`. There's no automatic fallback: on a platform the package has no native engine for, the plugin stops and says to set `'wasm'`. Any other value, such as a misspelled `'natve'`, is an error at startup. |
 | `tsconfig` | `string`<br>Default `tsconfig.app.json`, else `tsconfig.json`. Under Vitest, `tsconfig.spec.json` first | The tsconfig your Angular compiler options come from, relative to Vite's root. |
 | `entries` | `string[]`<br>Default `src/main.ts`, plus `src/main.server.ts` if it exists. Under Vitest, none | The modules the analyzer starts from. It finds every other file by following imports. |
 | `entryOnlyTsconfig` | `boolean`<br>Default `true` | Give the analyzer a generated tsconfig that lists only `entries`. |
