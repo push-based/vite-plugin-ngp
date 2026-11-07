@@ -29,6 +29,7 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 ### Server rendering
 
 - A server entry named in `ssr: {entry: 'src/server.ts'}` is now in the default `entries`, so it gets `zone.js/node`, your other `polyfills` and the `i18n` prelude. Before, only `src/main.ts` and `src/main.server.ts` were, and a zone.js app with a custom server entry failed to bootstrap on the server unless you set `entries`, which replaces the whole default. [Configuration](configuration#when-to-change-them)
+- With `ssr`, `vite build` now writes the browser bundle to `<outDir>/client` and the server entry to `<outDir>/server`, following your `build.outDir`. It used to write `dist/client` and `dist/server` whatever `build.outDir` said. Without a `build.outDir` nothing moves, and an `outDir` you set on the `client` or `ssr` environment is kept. [Server rendering](server-rendering#what-the-plugin-does)
 
 ## 6 November 2026
 

@@ -73,8 +73,9 @@ export interface NgpPluginOptions {
    * Server-side rendering. Ignored under Vitest. The entry module default-exports
    * `render(url: string, document: string): Promise<string>`, which turns index.html into the
    * rendered page. In dev, the plugin renders every page request through it. `vite build` then
-   * builds the client into `dist/client` and the entry into `dist/server`. `true` means the entry
-   * is `src/main.server.ts`. Off by default.
+   * builds the client into `<build.outDir>/client` and the entry into `<build.outDir>/server`
+   * (`build.outDir` defaults to `dist`). `true` means the entry is `src/main.server.ts`. Off by
+   * default.
    */
   ssr?: boolean | {entry?: string};
   /**
@@ -576,10 +577,7 @@ function compilerPlugin(
         ...(ssrEntry && {
           // `vite build` builds every environment: the browser bundle and the server entry.
           builder: {},
-          environments: {
-            client: {build: {outDir: 'dist/client'}},
-            ssr: {build: {outDir: 'dist/server', rolldownOptions: {input: ssrEntry}}},
-          },
+          environments: ssrEnvironments(userConfig, ssrEntry),
         }),
       };
     },
@@ -984,6 +982,21 @@ function linkerPlugin(): Plugin {
     },
     // Production builds, and dependencies Vite serves without pre-bundling.
     transform: {filter: LINKER_FILTER, handler: (code, id) => link(code, id) as never},
+  };
+}
+
+/**
+ * With `ssr`, the browser bundle goes to `<build.outDir>/client` and the server entry to
+ * `<build.outDir>/server`. An environment's own `build.outDir` wins over the top-level one, so
+ * these follow the app's `build.outDir`, and an outDir the app set on an environment is kept.
+ */
+function ssrEnvironments(userConfig: UserConfig, ssrEntry: string): UserConfig['environments'] {
+  const outDir = userConfig.build?.outDir ?? 'dist';
+  const outDirOf = (name: 'client' | 'ssr', folder: string) =>
+    userConfig.environments?.[name]?.build?.outDir ? {} : {outDir: path.join(outDir, folder)};
+  return {
+    client: {build: outDirOf('client', 'client')},
+    ssr: {build: {...outDirOf('ssr', 'server'), rolldownOptions: {input: ssrEntry}}},
   };
 }
 

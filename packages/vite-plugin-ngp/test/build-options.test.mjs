@@ -150,3 +150,17 @@ test('budgets: warnings are logged and errors fail `vite build`', async () => {
   await assert.rejects(build(root, {budgets: [{type: 'initial', maximumError: '10kB'}]}, {logger}), /1 budget exceeded: bundle initial/);
   assert.ok(messages.errors.some((e) => e.includes('bundle initial exceeded maximum budget')));
 });
+
+test('outputPath: with ssr, both bundles go below build.outDir', async () => {
+  const root = await copyFixture('ng-build-app', 'out-dir');
+  await build(root, {ssr: true}, {config: {build: {outDir: 'out'}}});
+  const names = async (dir) => (await readOutput(path.join(root, dir))).map((f) => f.name);
+  assert.ok((await names('out/client')).includes('index.html'), 'browser bundle in out/client');
+  assert.ok((await names('out/server')).includes('main.server.js'), 'server entry in out/server');
+  await assert.rejects(fs.access(path.join(root, 'dist')), {code: 'ENOENT'}, 'nothing in dist');
+
+  // An outDir set on an environment is the app's choice, and stays.
+  const config = {build: {outDir: 'out'}, environments: {ssr: {build: {outDir: 'server-bundle'}}}};
+  await build(root, {ssr: true}, {config});
+  assert.ok((await names('server-bundle')).includes('main.server.js'), 'server entry in server-bundle');
+});
