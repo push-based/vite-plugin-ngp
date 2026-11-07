@@ -18,7 +18,7 @@ export default defineConfig({
 });
 ```
 
-`ssr: true` expects the server entry at `src/main.server.ts`. To use another file, write `ssr: {entry: 'src/server.ts'}`.
+`ssr: true` expects the server entry at `src/main.server.ts`. To use another file, write `ssr: {entry: 'src/server.ts'}`. That file joins the default [`entries`](configuration#when-to-change-them), so it gets `zone.js/node` and your other `polyfills` without listing it there. If you do set `entries`, it replaces the default: list the server entry and `src/main.ts` both.
 
 ## The server entry
 

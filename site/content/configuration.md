@@ -36,7 +36,7 @@ export default defineConfig({
 | `toolchain` | `string`<br>Default: the `NGP_TOOLCHAIN` variable, then the ngp build inside the package | A directory holding another ngp build, `preprocessor/` and `engines/`. Leave it unset: the package carries ngp for macOS (arm64 and x64) and Linux (x64 and arm64, glibc), and uses it when neither this nor the variable is set. You need it only to run a build of ngp you made yourself, from a different Angular commit. |
 | `engine` | `'native' \| 'wasm'`<br>Default `'native'` | Which build of ngp's analyzer to load: the native Node addon, or `'wasm'`. There's no automatic fallback: on a platform the package has no native engine for, the plugin stops and says to set `'wasm'`. Any other value, such as a misspelled `'natve'`, is an error at startup. |
 | `tsconfig` | `string`<br>Default `tsconfig.app.json`, else `tsconfig.json`. Under Vitest, `tsconfig.spec.json` first | The tsconfig your Angular compiler options come from, relative to Vite's root. |
-| `entries` | `string[]`<br>Default `src/main.ts`, plus `src/main.server.ts` if it exists. Under Vitest, none | The modules the analyzer starts from. It finds every other file by following imports. |
+| `entries` | `string[]`<br>Default `src/main.ts`, `src/main.server.ts` and the `ssr` entry, each if it exists. Under Vitest, none | The modules the analyzer starts from, and the ones `polyfills` and `i18n` are imported into. It finds every other file by following imports. Setting it replaces the default. |
 | `entryOnlyTsconfig` | `boolean`<br>Default `true` | Give the analyzer a generated tsconfig that lists only `entries`. |
 | `hmr` | `boolean`<br>Default `true` | Component HMR in the dev server, for external templates and for inline `template` and `styles` edits. Builds and Vitest ignore it. |
 | `i18n` | `I18nOptions`<br>Off by default | Angular i18n: `sourceLocale`, `locales`, `devLocale` and `missingTranslation`. `vite build` writes one translated folder per locale, and the dev server serves `devLocale`. See [Internationalization](i18n). |
@@ -51,7 +51,7 @@ export default defineConfig({
 
 **`engine: 'wasm'`** is for platforms without a native build: Alpine and other musl-based Linux, Linux on a CPU other than x64 or arm64, and Windows outside WSL. It works everywhere, but the analyzer runs single-threaded. On a real app it took up to twice as long as native, which is why the plugin never switches to it on its own.
 
-**`entries`** needs every module that nothing else imports: a second entry point, or a server entry with another name. Files no entry reaches, directly or through imports, are invisible to the analyzer.
+**`entries`** needs every module that nothing else imports, such as a second entry point. A server entry with another name is already in the default when you name it in `ssr: {entry: ...}`. Setting `entries` replaces the default entirely, existence check included, so list `src/main.ts` and your server entry too: `entries: ['src/main.ts', 'src/server.ts', 'src/admin.ts']`. Files no entry reaches, directly or through imports, are invisible to the analyzer, and modules missing from `entries` don't get `polyfills` or the `i18n` prelude imported into them.
 
 **`entryOnlyTsconfig: false`** makes the analyzer read your tsconfig as it is. Use it if a file the analyzer should see isn't reachable from `entries`. Expect edits to get slower as the app grows: about 172 ms per edit at 5,000 components, against 1 ms.
 

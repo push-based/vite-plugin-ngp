@@ -26,6 +26,10 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 
 - Closing a dev server in middleware mode, the setup for hosting Vite inside your own Node server, now closes the ngp compilers. The plugin closed them when Vite's HTTP server closed, and middleware mode has none, so the analyzers and their threads outlived `vite.close()`. They now close when Vite closes the server, with or without an HTTP server. [Server rendering](server-rendering#what-the-plugin-does)
 
+### Server rendering
+
+- A server entry named in `ssr: {entry: 'src/server.ts'}` is now in the default `entries`, so it gets `zone.js/node`, your other `polyfills` and the `i18n` prelude. Before, only `src/main.ts` and `src/main.server.ts` were, and a zone.js app with a custom server entry failed to bootstrap on the server unless you set `entries`, which replaces the whole default. [Configuration](configuration#when-to-change-them)
+
 ## 6 November 2026
 
 ### Angular
