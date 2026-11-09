@@ -3,10 +3,17 @@ import {TestBed} from '@angular/core/testing';
 import {describe, expect, it} from 'vitest';
 import {Rating} from './rating';
 
-/** A host declared in the spec: ngp compiles it AOT like any other component. */
+/**
+ * A host declared in the spec: ngp compiles it AOT like any other component.
+ *
+ * In browser mode the real pointer rests at the page's origin, over the first star, and Chromium
+ * sends it a mouse move after a layout change under it. That `mouseenter` raced the hover spec's
+ * synthetic events and left the first star hovered. `pointer-events: none` keeps the real pointer
+ * out of hit-testing; `dispatchEvent` and `click()` don't hit-test, so the specs are unaffected.
+ */
 @Component({
   imports: [Rating],
-  template: `<app-rating [(value)]="score" [max]="4" /><output>{{ score() }}</output>`,
+  template: `<div style="pointer-events: none"><app-rating [(value)]="score" [max]="4" /></div><output>{{ score() }}</output>`,
 })
 class Host {
   readonly score = signal(2);
