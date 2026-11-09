@@ -42,7 +42,7 @@ Each entry records one choice: what we decided, why, what it costs, and when to 
 
 *16 October 2026*
 
-**Decision.** Write `tsconfig.entry.json` into Vite's cache directory. It extends the user's tsconfig, sets `files` to the entries and `include` to `[]`. The analyzer reads that one. Compiler options still come from the user's tsconfig. `entryOnlyTsconfig: false` turns it off.
+**Decision.** Write `tsconfig.entry.<hash>.json` into Vite's cache directory, named by a hash of its content and moved into place after it's written whole, so two Vite processes on one project, a dev server and a test run, say, never clobber or half-read each other's. It extends the user's tsconfig, sets `files` to the entries and `include` to `[]`. The analyzer reads that one. Compiler options still come from the user's tsconfig. `entryOnlyTsconfig: false` turns it off.
 
 **Why.** After every update, the analyzer reloads its tsconfig and re-expands the `include` globs: 172 ms per edit at 5,000 components, against about 1 ms with only `files` to resolve. The output was identical in the bench's spike.
 
