@@ -24,6 +24,7 @@ export default defineConfig({
       fileReplacements: [],
       budgets: [],
       polyfills: [],
+      cache: true,
     }),
   ],
 });
@@ -46,6 +47,7 @@ export default defineConfig({
 | `fileReplacements` | `{replace: string; with: string}[]`<br>Default `[]` | angular.json's `fileReplacements`, relative to Vite's root. Every import of `replace` gets the content of `with`, in Vite and in ngp's analyzer, in dev and in builds. |
 | `budgets` | `Budget[]`<br>Default `[]` | angular.json's `budgets`: size limits checked after `vite build`, with the CLI's types and messages. An error budget fails the build. |
 | `polyfills` | `string[]`<br>Default `[]` | angular.json's `polyfills`: packages or files imported before your app. `zone.js` also makes the plugin rewrite `async`/`await` so zone.js can track it. |
+| `cache` | `boolean`<br>Default `true` | Keep compiled output between runs, under Vite's `cacheDir`. `vite build` and Vitest then skip ngp's code generation, the linker and the build optimizer for every module whose inputs are unchanged. The dev server never uses it. See [Reusing output between builds](how-it-works#reusing-output-between-builds). |
 
 ## When to change them
 
@@ -56,6 +58,8 @@ export default defineConfig({
 **`entryOnlyTsconfig: false`** makes the analyzer read your tsconfig as it is. Use it if a file the analyzer should see isn't reachable from `entries`. Expect edits to get slower as the app grows: about 172 ms per edit at 5,000 components, against 1 ms.
 
 **`ssr: true`** renders every page on the server in the dev server, and makes `vite build` build two bundles below your `build.outDir` (`dist` by default): `<outDir>/client` for the browser and `<outDir>/server/main.server.js` for the server. The entry's default export must be `render(url, document)`.
+
+**`cache: false`** compiles every module on every build and test run, as the plugin did before 9 November 2026. Use it to rule the cache out when a build's output looks stale, and open an issue if that fixes it: a stale hit means the key is missing an input, which is a bug. Deleting `node_modules/.vite/vite-plugin-ngp/cache` has the same effect once. In CI, the cache only helps if the `cacheDir` is restored between runs, at the same path: the project's root is part of every key.
 
 **`typeCheck: false`** skips the check in the dev server and in builds. Use it if you already run `tsc` or `ng build` in CI and the dev-server check is too slow on your app, or if your `cacheDir` is outside the project. Builds then succeed with type errors in them.
 

@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import {readConfiguration} from '@angular/compiler-cli';
 import {hmrCandidates} from './hmr-candidates.js';
 import {FileUpdateType, loadNgp, type Analyzer, type Engine, type HybridCompiler, type NgpDiagnostic} from './ngp-api.js';
+import {stableJson, toolchainId, type OutputCache} from './output-cache.js';
 
 export interface CompilerOptions {
   toolchainDir: string;
@@ -18,6 +19,8 @@ export interface CompilerOptions {
    * each replacement's content as the replaced file's, before it compiles anything.
    */
   fileReplacements?: Map<string, string>;
+  /** Compiled output kept between runs. Builds and Vitest set it; the dev server doesn't. */
+  cache?: OutputCache;
 }
 
 /** One component's HMR update: Angular's id for it, and the update module as TypeScript. */
@@ -33,6 +36,9 @@ export interface FileUpdate {
   previous: string | undefined;
 }
 
+/** What the analyzer knows about one file, or null for a file it has nothing on. */
+type FileMetadata = Awaited<ReturnType<Analyzer['getMetadataForFile']>>;
+
 /** A component stylesheet: a `styleUrl` file, or an inline style and its size. */
 export type ComponentStyle = {label: string; file: string} | {label: string; size: number};
 
@@ -40,6 +46,8 @@ export interface TransformResult {
   code: string;
   map: string;
   diagnostics: NgpDiagnostic[];
+  /** The output came from the cache, not from ngp. */
+  cached?: boolean;
 }
 
 /**
@@ -70,6 +78,9 @@ export class NgpCompiler {
     private readonly typeCheckHybrid: HybridCompiler,
     private readonly rootDir: string,
     private readonly replaced: ReadonlySet<string>,
+    private readonly cache: OutputCache | null,
+    /** What every cached output of this compiler depends on, besides the module. See cacheKey. */
+    private readonly cacheIdentity: string,
   ) {}
 
   static async create(options: CompilerOptions): Promise<NgpCompiler> {
@@ -107,7 +118,26 @@ export class NgpCompiler {
     }
     const typeCheckHybrid = new api.HybridCompiler(analyzer, {...hybridOptions, enableHmr: false, preserveWhitespaces: true});
     const replacements = options.fileReplacements ?? new Map<string, string>();
-    const compiler = new NgpCompiler(analyzer, hybrid, typeCheckHybrid, rootDir, new Set(replacements.keys()));
+    // The ngp build, the engine, and every option that reaches ngp. `tcbConfig` only shapes
+    // type-check blocks. The root stays in: compiled code names its stylesheets by absolute path,
+    // so a cache copied to another checkout must miss.
+    const cacheIdentity = options.cache
+      ? JSON.stringify({
+          toolchain: await toolchainId(options.toolchainDir),
+          engine: options.engine,
+          hybrid: {...hybridOptions, tcbConfig: undefined},
+          ngOptions: stableJson(ngOptions),
+        })
+      : '';
+    const compiler = new NgpCompiler(
+      analyzer,
+      hybrid,
+      typeCheckHybrid,
+      rootDir,
+      new Set(replacements.keys()),
+      options.cache ?? null,
+      cacheIdentity,
+    );
     // The analyzer follows imports on disk, so it would read the replaced file. Giving it the
     // replacement's content under the replaced file's path makes every file that imports it, and
     // every decorator that reads a value from it, compile against the replacement.
@@ -123,23 +153,66 @@ export class NgpCompiler {
    */
   async transform(file: string, code: string, readAt?: number): Promise<TransformResult | null> {
     await this.update(file, code, 'transform', readAt);
-    const processed = await this.hybrid.processFile(file, code);
-    if (!processed.magicString.hasChanged()) {
+    const metadata = await this.analyzer.getMetadataForFile(file);
+    const key = await this.cacheKey(file, code, metadata);
+    if (key) {
+      const hit = await this.cache!.get<{result: TransformResult | null}>(key);
+      if (hit) {
+        return hit.result && {...hit.result, cached: true};
+      }
+    }
+    const processed = await this.hybrid.processFile(file, code, metadata ?? undefined);
+    const result = processed.magicString.hasChanged()
+      ? {
+          code: processed.magicString.toString(),
+          map: processed.magicString.generateMap({hires: 'boundary', source: file, includeContent: true}).toString(),
+          diagnostics: [...(processed.diagnostics ?? []), ...(await this.missingTemplates(file, metadata))],
+        }
+      : null;
+    if (key) {
+      await this.cache!.put(key, {result});
+    }
+    return result;
+  }
+
+  /**
+   * The cache entry for one module's output, or null when there's no cache, or a template or
+   * stylesheet file is missing, which the compile has to report.
+   *
+   * The output is a function of: the ngp build, its options and the root (`cacheIdentity`); the module's
+   * path and code as Vite hands it over; the content of its external templates and stylesheets;
+   * and the analyzer's metadata for the file, which carries the selector, inputs, outputs,
+   * standalone flag and host directives of every declaration its templates use, and the value of
+   * every constant its decorators read. So a change to a used component's public shape misses,
+   * and a comment edit in that component's file hits. The analyzer runs either way: only ngp's
+   * code generation is skipped. A missing input here would serve a wrong module with no error,
+   * which is why there's a test for each kind.
+   */
+  private async cacheKey(file: string, code: string, metadata: FileMetadata): Promise<string | null> {
+    if (!this.cache) {
       return null;
     }
-    return {
-      code: processed.magicString.toString(),
-      map: processed.magicString.generateMap({hires: 'boundary', source: file, includeContent: true}).toString(),
-      diagnostics: [...(processed.diagnostics ?? []), ...(await this.missingTemplates(file))],
-    };
+    const resources: string[] = [];
+    for (const cls of metadata?.classes ?? []) {
+      for (const url of [cls.component?.templateUrl, ...(cls.component?.styleUrls ?? [])]) {
+        if (!url) {
+          continue;
+        }
+        const content = await fs.readFile(url.resolvedPath, 'utf8').catch(() => undefined);
+        if (content === undefined) {
+          return null;
+        }
+        resources.push(url.resolvedPath, content);
+      }
+    }
+    return this.cache.key([this.cacheIdentity, file, code, resources, stableJson(metadata)]);
   }
 
   /**
    * ngp compiles a component whose `templateUrl` file doesn't exist into an empty template, with
    * no diagnostic, even in a fresh compiler. ngc fails with NG2008, so report it the same way.
    */
-  private async missingTemplates(file: string): Promise<NgpDiagnostic[]> {
-    const metadata = await this.analyzer.getMetadataForFile(file);
+  private async missingTemplates(file: string, metadata: FileMetadata): Promise<NgpDiagnostic[]> {
     const missing: NgpDiagnostic[] = [];
     for (const cls of metadata?.classes ?? []) {
       const templateUrl = cls.component?.templateUrl;

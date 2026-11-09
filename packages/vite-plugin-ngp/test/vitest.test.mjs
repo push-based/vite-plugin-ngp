@@ -21,7 +21,9 @@ async function modulesSeen(filter) {
     cwd: playground,
     env: {...process.env, DEBUG: 'vite-plugin-ngp', NGP_TOOLCHAIN: process.env.NGP_TOOLCHAIN ?? path.join(repo, 'toolchain/out')},
   });
-  return [...stderr.matchAll(/^vite-plugin-ngp (compiled|unchanged) (\S+)/gm)].map((m) => `${m[1]} ${m[2]}`).sort();
+  // A module the output cache served is logged as `reused`: it was asked for all the same, so it
+  // counts as compiled here, and the test reads the same with a warm cache as with a cold one.
+  return [...stderr.matchAll(/^vite-plugin-ngp (compiled|reused|unchanged) (\S+)/gm)].map((m) => `${m[1] === 'reused' ? 'compiled' : m[1]} ${m[2]}`).sort();
 }
 
 test('a run filtered to one spec compiles only what that spec imports', async () => {
