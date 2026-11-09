@@ -74,7 +74,6 @@
     "node": ">=26.0.0"
   },
   "dependencies": {
-    "@babel/core": "8.0.7",
     "@jridgewell/remapping": "2.3.5",
     "esbuild": "0.28.2",
     "magic-string": "1.4.3",

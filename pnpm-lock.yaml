@@ -50,9 +50,6 @@ importers:
 
   packages/vite-plugin-ngp:
     dependencies:
-      '@babel/core':
-        specifier: 8.0.7
-        version: 8.0.7
       '@jridgewell/remapping':
         specifier: 2.3.5
         version: 2.3.5
