@@ -31,7 +31,7 @@ describe('FeatureDetail, routed', () => {
 
   it('links to the next feature, and follows the link', async () => {
     await harness.navigateByUrl('/router/signals');
-    const next = [...detail().element.querySelectorAll('a')].find((a) => a.textContent!.includes('→'))!;
+    const next = Array.from(detail().element.querySelectorAll('a')).find((a) => a.textContent!.includes('→'))!;
     expect(next.getAttribute('href')).toBe('/router/control-flow');
 
     next.click();

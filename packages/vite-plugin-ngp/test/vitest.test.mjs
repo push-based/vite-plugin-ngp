@@ -17,7 +17,7 @@ const vitestBin = path.join(path.dirname(createRequire(path.join(playground, 'pa
 
 /** Runs `vitest run <filter>` in the playground and returns every module ngp saw, sorted. */
 async function modulesSeen(filter) {
-  const {stderr} = await promisify(execFile)(process.execPath, [vitestBin, 'run', filter], {
+  const {stderr} = await promisify(execFile)(process.execPath, [vitestBin, 'run', '--project', 'server', filter], {
     cwd: playground,
     env: {...process.env, DEBUG: 'vite-plugin-ngp', NGP_TOOLCHAIN: process.env.NGP_TOOLCHAIN ?? path.join(repo, 'toolchain/out')},
   });
@@ -29,11 +29,11 @@ test('a run filtered to one spec compiles only what that spec imports', async ()
     'compiled src/app/pages/components/rating.spec.ts',
     'compiled src/app/pages/components/rating.ts',
     'compiled src/app/ui/icon.ts',
-    'unchanged src/test-setup.ts',
+    'unchanged src/testing/server.ts',
   ]);
   assert.deepEqual(await modulesSeen('src/app/core/toast.spec.ts'), [
     'compiled src/app/core/toast.ts',
     'unchanged src/app/core/toast.spec.ts',
-    'unchanged src/test-setup.ts',
+    'unchanged src/testing/server.ts',
   ]);
 });

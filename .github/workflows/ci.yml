@@ -40,7 +40,10 @@ jobs:
       # so toolchain/bundle.mjs can't break between releases. The tests below still use toolchain/out.
       - run: node toolchain/bundle.mjs --host-only
 
-      # The plugin's own tests, then the playground's specs under Vitest.
+      # The playground's browser-mode project runs its specs in headless Chromium.
+      - run: pnpm --filter playground exec playwright install --with-deps chromium
+
+      # The plugin's own tests, then the playground's specs under Vitest, three ways.
       - run: pnpm test
 
       - run: pnpm playground:build
