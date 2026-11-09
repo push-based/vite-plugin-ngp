@@ -21,7 +21,7 @@ Analog and `@oxc-angular/vite` were checked in their source and docs on 17 Octob
 | Template type-checking | Yes | Off by default; on under `@analogjs/platform` | No | No | Yes, in a separate process |
 | Component HMR | On by default | Off by default | Off by default | On by default | On by default, with the CLI's rules |
 | SSR | `@angular/ssr`, with prerendering | `@analogjs/platform`, on by default | Same as default | An `ssrEntry` option; not tried here | A `render(url, document)` contract; you write the server |
-| Linking libraries | The CLI's oxc linker | Angular's linker | Angular's linker | Its own Rust linker | Angular's Babel linker |
+| Linking libraries | The CLI's oxc linker | Angular's linker | Angular's linker | Its own Rust linker | A port of the CLI's oxc linker |
 | How you get it | `npm install` | `npm install`, 2.8.1 | `npm install`, opt-in flag | `npm install`, 0.0.41, "experimental" | `npm install`, 0.2.0; one Angular prerelease |
 
 Each row is explained below, with its source.
@@ -84,9 +84,9 @@ Angular libraries ship partially compiled, and every one of these tools has to l
 - **The Angular CLI** links with an oxc-based linker it moved to in 2026 ([angular/angular-cli#33625](https://github.com/angular/angular-cli/pull/33625)). It's private to `@angular/build`.
 - **Analog** runs Angular's linker in Vite's dependency optimizer and on library files in builds.
 - **`@oxc-angular/vite`** has its own linker in Rust.
-- **vite-plugin-ngp** uses Angular's public Babel linker, in pre-bundling, builds, server bundles and Vitest ([How it works](how-it-works#linking-libraries)).
+- **vite-plugin-ngp** runs Angular's `FileLinker` over Vite's oxc parser, a port of the CLI's private pair, in pre-bundling, builds, server bundles and Vitest ([How it works](how-it-works#linking-libraries)).
 
-Babel is the slow one. Most of the plugin's cold start at 5,000 components is Vite pre-bundling Angular's packages, which runs the linker; a restart skips it ([Performance](performance#starting-the-dev-server)). The plugin can switch to the CLI's linker when `@angular/build` makes it public ([decision 12](https://github.com/push-based/vite-plugin-ngp/blob/main/docs/decisions.md#12-link-libraries-with-angulars-babel-linker)).
+Until 9 November 2026 the plugin used Angular's public Babel linker, and that was the slow one: most of the plugin's cold start at 5,000 components is Vite pre-bundling Angular's packages, which runs the linker, and a restart skips it ([Performance](performance#starting-the-dev-server)). The oxc port links the same modules about three times faster in a direct comparison; the bench hasn't been rerun since ([decision 65](https://github.com/push-based/vite-plugin-ngp/blob/main/docs/decisions.md#65-link-with-a-port-of-the-clis-oxc-linker)).
 
 ## Maturity and installing it
 

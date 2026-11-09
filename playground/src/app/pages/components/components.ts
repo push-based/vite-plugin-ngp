@@ -32,7 +32,7 @@ export class Components {
   protected readonly features = [
     {name: 'Analyzer', detail: 'Rust, on oxc', color: 'var(--accent-soft)'},
     {name: 'Code generator', detail: "Angular's template compiler", color: 'var(--accent-2-soft)'},
-    {name: 'Linker', detail: 'Babel, for node_modules', color: 'var(--success-soft)'},
+    {name: 'Linker', detail: 'oxc, for node_modules', color: 'var(--success-soft)'},
   ];
 
   protected pickColor(color: string): void {

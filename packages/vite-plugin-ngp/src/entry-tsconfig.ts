@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -15,13 +16,21 @@ export async function writeEntryTsconfig(options: {
   entries: string[];
   outDir: string;
 }): Promise<string> {
-  const file = path.join(options.outDir, 'tsconfig.entry.json');
   const content = {
     extends: options.tsconfig,
     files: options.entries,
     include: [],
   };
+  const json = JSON.stringify(content, null, 2) + '\n';
+  // Named by its content, so two Vite processes sharing the cache directory with different
+  // entries, like a dev server next to a test run, never overwrite each other's; and written
+  // whole, then moved into place, so neither ever reads a half-written file. The analyzer rereads
+  // it after every update.
+  const hash = createHash('sha256').update(json).digest('hex').slice(0, 8);
+  const file = path.join(options.outDir, `tsconfig.entry.${hash}.json`);
   await fs.mkdir(options.outDir, {recursive: true});
-  await fs.writeFile(file, JSON.stringify(content, null, 2) + '\n');
+  const partial = `${file}.${process.pid}.tmp`;
+  await fs.writeFile(partial, json);
+  await fs.rename(partial, file);
   return file;
 }

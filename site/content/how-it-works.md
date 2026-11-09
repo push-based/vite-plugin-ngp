@@ -75,6 +75,10 @@ Angular libraries, Angular's own packages included, ship partially compiled: `ɵ
 
 Without a linker, the browser would need Angular's JIT compiler to finish compiling libraries at startup. In the playground, linking cut the production bundle from 1,197 kB to 589 kB.
 
+The linking is Angular's own `FileLinker`, from `@angular/compiler-cli/linker`, but the plugin doesn't run it through Babel. It parses the module once with the oxc parser Vite ships, hands each `ɵɵngDeclare` call to the linker, and splices the definition it gets back into the original text. The module is never printed, so everything outside those calls comes out byte for byte as it went in. This is the design the Angular CLI moved to in 2026 ([angular/angular-cli#33625](https://github.com/angular/angular-cli/pull/33625)), ported here because the CLI's copy is private to `@angular/build`. One visible difference from the Babel linker: each declaration's constants, like its parsed template, stay in a pure IIFE around the definition instead of moving to module scope, so an unused component's constants disappear with it when the bundler drops the component.
+
+It's about three times faster. Linking the 21 partially compiled modules of Angular's own packages in this repo, 626 kB in all, takes the oxc path about 75 ms warm against about 225 ms for Babel, and the first module 36 ms against 298 ms, since there's no Babel to load. That's the two `link` functions timed in one Node process on a laptop on 9 November 2026, not a bench run; the [Performance](performance) page's cold-start figures were measured before the change.
+
 ## Compile-time globals
 
 The plugin defines the same globals the Angular CLI does, so the minifier can drop code your build doesn't need:

@@ -42,7 +42,7 @@ Each entry records one choice: what we decided, why, what it costs, and when to 
 
 *16 October 2026*
 
-**Decision.** Write `tsconfig.entry.json` into Vite's cache directory. It extends the user's tsconfig, sets `files` to the entries and `include` to `[]`. The analyzer reads that one. Compiler options still come from the user's tsconfig. `entryOnlyTsconfig: false` turns it off.
+**Decision.** Write `tsconfig.entry.<hash>.json` into Vite's cache directory, named by a hash of its content and moved into place after it's written whole, so two Vite processes on one project, a dev server and a test run, say, never clobber or half-read each other's. It extends the user's tsconfig, sets `files` to the entries and `include` to `[]`. The analyzer reads that one. Compiler options still come from the user's tsconfig. `entryOnlyTsconfig: false` turns it off.
 
 **Why.** After every update, the analyzer reloads its tsconfig and re-expands the `include` globs: 172 ms per edit at 5,000 components, against about 1 ms with only `files` to resolve. The output was identical in the bench's spike.
 
@@ -128,7 +128,7 @@ Each entry records one choice: what we decided, why, what it costs, and when to 
 
 ## 12. Link libraries with Angular's Babel linker
 
-*16 October 2026. Replaces 9.*
+*16 October 2026. Replaces 9. Superseded by 65.*
 
 **Decision.** The plugin runs `createEs2015LinkerPlugin` from `@angular/compiler-cli/linker/babel` on every `node_modules` module that contains `ɵɵngDeclare`, except `@angular/core` and `@angular/compiler`. It runs as a Rolldown plugin in `optimizeDeps.rolldownOptions` for dev pre-bundling, and as a `transform` for builds and for deps that aren't pre-bundled. The playground no longer imports `@angular/compiler`.
 
@@ -775,3 +775,13 @@ A disk cache of the linker's output, keyed by file content and Angular version, 
 **Cost.** The playground installs jsdom, Playwright and the provider, and CI downloads Chromium on every run, about 100 MB. Two specs had to avoid Domino's gaps to pass on all three. Only Chromium is run; Firefox and WebKit go untested.
 
 **Revisit when** the three setups diverge in what the plugin has to do, which would be the time for a plugin option, or when CI time for the browser download becomes a complaint.
+
+## 65. Link with a port of the CLI's oxc linker
+
+*9 November 2026. Replaces 12.*
+
+**Decision.** The plugin links `node_modules` with Angular's `FileLinker`, from the public `@angular/compiler-cli/linker` entry point, driven by an oxc `AstHost` and a string-emitting `AstFactory` in [linker-oxc.ts](../packages/vite-plugin-ngp/src/linker-oxc.ts). Both are ports of the pair the CLI keeps in `@angular/build`'s private tree (`src/tools/angular/linker/`, MIT), about 560 lines in all. [linker.ts](../packages/vite-plugin-ngp/src/linker.ts) parses a module once with Vite's `parseSync`, walks its call expressions, hands each `ɵɵngDeclare` call to the linker and splices the string it gets back into the source with magic-string. The declaration scope is the CLI's inline one: a declaration's constants stay in a pure IIFE around its definition rather than moving to module scope. `@babel/core` left the package's dependencies. The plugin's wiring didn't change: the same `link` runs in dependency pre-bundling, in builds, in server bundles and under Vitest.
+
+**Why.** Babel was the slow part of linking, and linking is most of the cold start ([performance](../site/content/performance.md)). The linker core is parser-agnostic, so the cost of dropping Babel was only the host and factory. Measured in one Node process on 9 November 2026, over the 21 partially compiled fesm2022 modules of the Angular packages installed in this repo (626 kB): Babel took about 225 ms warm per pass and 298 ms for the first module; the oxc path about 75 ms and 36 ms. The output is the same size, and the playground's production bundle came out byte for byte identical after minification. Importing the CLI's own copy was the alternative, and it's worse on every axis: `@angular/build`'s exports map doesn't expose the file, so it would be reached by absolute path; the package pulls in rolldown, esbuild and still `@babel/core`; and it carries no semver guarantee. The port depends only on the public linker API.
+
+**Cost.** Two files to keep in step with the CLI's if the `AstHost` or `AstFactory` interfaces change; the optimizer already carries the same kind of port ([decision 24](#24-port-the-clis-build-optimizer-in-builds-only)). Source maps for linked modules come from magic-string's ranges rather than the linker's own mapping, so a position inside a linked definition maps to the start of the declaration call, as it did with `sourceMapping: false` before. The bench hasn't been rerun, so the cold-start figures on the site still describe the Babel linker and say so.

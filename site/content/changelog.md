@@ -7,6 +7,16 @@ description: What changed in vite-plugin-ngp, newest first, for anyone following
 
 What changed in vite-plugin-ngp, newest first, written for people using it. Every entry links to the page that documents it. Versions on npm, with the commits in each, are in the repo's [CHANGELOG.md](https://github.com/push-based/vite-plugin-ngp/blob/main/CHANGELOG.md) and its [GitHub releases](https://github.com/push-based/vite-plugin-ngp/releases).
 
+## 9 November 2026
+
+### Linking libraries
+
+- The linker no longer runs through Babel. The plugin drives Angular's `FileLinker` over Vite's oxc parser, a port of the pair the CLI keeps private, and splices each linked definition into the module in place. On the 21 partially compiled modules of Angular's own packages it's about three times faster warm and eight times on the first module, measured in one process, not on the bench. The output is the same; a declaration's constants now sit in a pure IIFE around its definition instead of at module scope. `@babel/core` is gone from the package's dependencies. [How it works](how-it-works#linking-libraries), [Status and limits](status#where-its-weakest)
+
+### Fixes
+
+- The generated entry-only tsconfig in Vite's cache directory is now named by its content and moved into place after it's written whole. Two Vite processes on one project with different entries, a dev server next to a Vitest run, say, could overwrite each other's file or read a half-written one and fail with "Could not load the ng-exp-compiler analysis engine". [Configuration](configuration)
+
 ## 7 November 2026
 
 ### Configuration
