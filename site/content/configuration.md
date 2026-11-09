@@ -34,9 +34,9 @@ export default defineConfig({
 | Option | Type, default | What it does |
 |---|---|---|
 | `toolchain` | `string`<br>Default: the `NGP_TOOLCHAIN` variable, then the ngp build inside the package | A directory holding another ngp build, `preprocessor/` and `engines/`. Leave it unset: the package carries ngp for macOS (arm64 and x64) and Linux (x64 and arm64, glibc), and uses it when neither this nor the variable is set. You need it only to run a build of ngp you made yourself, from a different Angular commit. |
-| `engine` | `'native' \| 'wasm'`<br>Default `'native'` | Which build of ngp's analyzer to load: the native Node addon, or `'wasm'`. There's no automatic fallback: on a platform the package has no native engine for, the plugin stops and says to set `'wasm'`. |
+| `engine` | `'native' \| 'wasm'`<br>Default `'native'` | Which build of ngp's analyzer to load: the native Node addon, or `'wasm'`. There's no automatic fallback: on a platform the package has no native engine for, the plugin stops and says to set `'wasm'`. Any other value, such as a misspelled `'natve'`, is an error at startup. |
 | `tsconfig` | `string`<br>Default `tsconfig.app.json`, else `tsconfig.json`. Under Vitest, `tsconfig.spec.json` first | The tsconfig your Angular compiler options come from, relative to Vite's root. |
-| `entries` | `string[]`<br>Default `src/main.ts`, plus `src/main.server.ts` if it exists. Under Vitest, none | The modules the analyzer starts from. It finds every other file by following imports. |
+| `entries` | `string[]`<br>Default `src/main.ts`, `src/main.server.ts` and the `ssr` entry, each if it exists. Under Vitest, none | The modules the analyzer starts from, and the ones `polyfills` and `i18n` are imported into. It finds every other file by following imports. Setting it replaces the default. |
 | `entryOnlyTsconfig` | `boolean`<br>Default `true` | Give the analyzer a generated tsconfig that lists only `entries`. |
 | `hmr` | `boolean`<br>Default `true` | Component HMR in the dev server, for external templates and for inline `template` and `styles` edits. Builds and Vitest ignore it. |
 | `i18n` | `I18nOptions`<br>Off by default | Angular i18n: `sourceLocale`, `locales`, `devLocale` and `missingTranslation`. `vite build` writes one translated folder per locale, and the dev server serves `devLocale`. See [Internationalization](i18n). |
@@ -51,15 +51,15 @@ export default defineConfig({
 
 **`engine: 'wasm'`** is for platforms without a native build: Alpine and other musl-based Linux, Linux on a CPU other than x64 or arm64, and Windows outside WSL. It works everywhere, but the analyzer runs single-threaded. On a real app it took up to twice as long as native, which is why the plugin never switches to it on its own.
 
-**`entries`** needs every module that nothing else imports: a second entry point, or a server entry with another name. Files no entry reaches, directly or through imports, are invisible to the analyzer.
+**`entries`** needs every module that nothing else imports, such as a second entry point. A server entry with another name is already in the default when you name it in `ssr: {entry: ...}`. Setting `entries` replaces the default entirely, existence check included, so list `src/main.ts` and your server entry too: `entries: ['src/main.ts', 'src/server.ts', 'src/admin.ts']`. Files no entry reaches, directly or through imports, are invisible to the analyzer, and modules missing from `entries` don't get `polyfills` or the `i18n` prelude imported into them.
 
 **`entryOnlyTsconfig: false`** makes the analyzer read your tsconfig as it is. Use it if a file the analyzer should see isn't reachable from `entries`. Expect edits to get slower as the app grows: about 172 ms per edit at 5,000 components, against 1 ms.
 
-**`ssr: true`** renders every page on the server in the dev server, and makes `vite build` build two bundles: `dist/client` for the browser and `dist/server/main.server.js` for the server. The entry's default export must be `render(url, document)`.
+**`ssr: true`** renders every page on the server in the dev server, and makes `vite build` build two bundles below your `build.outDir` (`dist` by default): `<outDir>/client` for the browser and `<outDir>/server/main.server.js` for the server. The entry's default export must be `render(url, document)`.
 
 **`typeCheck: false`** skips the check in the dev server and in builds. Use it if you already run `tsc` or `ng build` in CI and the dev-server check is too slow on your app, or if your `cacheDir` is outside the project. Builds then succeed with type errors in them.
 
-**`typeChecker: 'tsrs'`** runs the same check with tsrs, a pre-1.0 Rust port of TypeScript 7, after `npm install -D tsrs`. On a 5,000-component app it reported a planted error in 1.12 s against `tsgo`'s 1.56 s; on a small app there's nothing to gain. No package for Intel Macs. See [Checking with tsrs](type-checking#checking-with-tsrs).
+**`typeChecker: 'tsrs'`** runs the same check with tsrs, a pre-1.0 Rust port of TypeScript 7, after `npm install -D tsrs`. On a 5,000-component app it reported a planted error in 1.02 s against `tsgo`'s 1.36 s; on a small app there's nothing to gain. No package for Intel Macs. See [Checking with tsrs](type-checking#checking-with-tsrs).
 
 **`fileReplacements`** is for environment files. Pick the list by Vite's `mode`, the way angular.json picks it by configuration:
 
@@ -113,7 +113,7 @@ You don't configure these, but they explain what you see when you debug:
 - A dev-server middleware that answers `/@ng/component` requests with component updates.
 - With `typeCheck`: a `vite-plugin-ngp/type-check` folder in Vite's cache directory, holding the type-check blocks, the check's tsconfig and its incremental build info. In the dev server, a script tag in `index.html` loads `/@ngp/type-check-client.js`, which shows type errors in Vite's overlay. It's left out when `server.hmr.overlay` is `false`.
 - A resolver for component stylesheet names in the dev server, like `card.ngp-de07cd19.css`, and a transform that scopes component stylesheets after Vite's CSS plugin has compiled them. See [Component styles](styles).
-- With `ssr`: `builder: {}` and output directories for the `client` and `ssr` environments, and a middleware that renders page requests through your server entry.
+- With `ssr`: `builder: {}`, `build.outDir` for the `client` environment as `<outDir>/client` and for the `ssr` environment as `<outDir>/server`, unless you set an environment's own `build.outDir`, and a middleware that renders page requests through your server entry.
 - Under Vitest, none of the above except the linker. Instead: `test.server.deps.inline` with every Angular library, from `devDependencies` too, so they get linked; a cache key generator that keeps your app's modules out of Vitest's module cache; and a watcher that sends edits to the analyzer, since Vitest turns Vite's HMR off. See [Testing with Vitest](testing).
 - With `fileReplacements`: a `load` hook that returns the replacement's content for the replaced file, and watches the replacement.
 - With `polyfills`: one import per polyfill at the top of each module in `entries`. With `zone.js`, a `transform` in the dev server and a `renderChunk` in builds that rewrite `async` functions with esbuild.

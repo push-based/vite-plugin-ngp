@@ -66,7 +66,7 @@ That draws the figures on the docs site's Performance and Benchmarks pages into 
 
 ## The tools, and how each is set up
 
-Every tool runs from `bench/node_modules` with Angular 22.3.0-next.2, the version ngp is built from, and the three Vite plugins with Vite 8.3.4. Each one gets its README's setup and nothing else, written into the app by [lib/tools.mjs](lib/tools.mjs). The only additions are a separate `cacheDir` and `build.outDir` per tool, so no tool reuses another's dependency cache or output.
+Every tool runs from `bench/node_modules` with Angular 22.3.0-next.4, the version ngp is built from, and the three Vite plugins with Vite 8.3.4. Each one gets its README's setup and nothing else, written into the app by [lib/tools.mjs](lib/tools.mjs). The only additions are a separate `cacheDir` and `build.outDir` per tool, so no tool reuses another's dependency cache or output.
 
 | Tool | Dev | Build | Type-checks? |
 |---|---|---|---|
@@ -79,7 +79,7 @@ Three variants are opt-in, for questions the defaults can't answer: `ngp-notc` (
 
 Where the setup isn't what a user would get from `npm install`, and why:
 
-- **Analog is 2.8.2-beta.1, patched.** The latest stable, 2.8.1, fails `vite build` on Angular 22.3: its build optimizer calls `@angular/build`'s private `JavaScriptTransformer` without the `initializeHash()` call that 22.2 started to require. 2.8.2-beta.1 adds the call behind a version check, but the check computes the version with `Number('0-next.2')`, which is `NaN` for a prerelease, so it still fails. [patches/](patches) changes that one line to `parseInt`. On a stable Angular 22.2 or later, the unpatched beta would take the same path.
+- **Analog is 2.8.2-beta.1, patched.** The latest stable, 2.8.1, fails `vite build` on Angular 22.3: its build optimizer calls `@angular/build`'s private `JavaScriptTransformer` without the `initializeHash()` call that 22.2 started to require. 2.8.2-beta.1 adds the call behind a version check, but the check computes the version with `Number('0-next.4')`, which is `NaN` for a prerelease, so it still fails. [patches/](patches) changes that one line to `parseInt`. On a stable Angular 22.2 or later, the unpatched beta would take the same path.
 - **@oxc-angular/vite 0.0.41 targets Angular 22.2.2's output.** It doesn't use Angular's compiler at all, so the Angular version only matters at runtime here.
 - **The CLI can't run the playground.** The playground reads `import.meta.env` and `import.meta.hot`, which only Vite defines. The generated apps are plain Angular CLI workspaces and run everywhere.
 - **The playground runs without SSR.** Its own config turns on vite-plugin-ngp's server rendering, which none of the others offers in the same form, so every tool renders it in the browser.
@@ -102,7 +102,7 @@ node real.mjs super-productivity
 node real.mjs ghostfolio
 ```
 
-That clones each app at its commit into `.work/real.noindex/`, pins every `@angular/*` package to `22.3.0-next.2`, runs the app's own install, applies the patch, writes a root `index.html` from the app's own plus the stylesheet links and entry script its CLI injects, and copies `vite.config.ngp.mjs` and its helpers in. Then:
+That clones each app at its commit into `.work/real.noindex/`, pins every `@angular/*` package to `22.3.0-next.4`, runs the app's own install, applies the patch, writes a root `index.html` from the app's own plus the stylesheet links and entry script its CLI injects, and copies `vite.config.ngp.mjs` and its helpers in. Then:
 
 ```bash
 NGP_TOOLCHAIN="$PWD/../toolchain/out" node run.mjs --apps super-productivity,ghostfolio --tools ngp,cli,nx

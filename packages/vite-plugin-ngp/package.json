@@ -45,9 +45,9 @@
     "prepack": "node ../../toolchain/bundle.mjs --check"
   },
   "peerDependencies": {
-    "@angular/compiler": "22.3.0-next.2",
-    "@angular/compiler-cli": "22.3.0-next.2",
-    "@angular/localize": "22.3.0-next.2",
+    "@angular/compiler": "22.3.0-next.4",
+    "@angular/compiler-cli": "22.3.0-next.4",
+    "@angular/localize": "22.3.0-next.4",
     "tsrs": ">=0.16.0-0",
     "typescript": ">=6.0 <6.1",
     "vite": "^8.3.0"
@@ -61,9 +61,9 @@
     }
   },
   "devDependencies": {
-    "@angular/compiler": "22.3.0-next.2",
-    "@angular/compiler-cli": "22.3.0-next.2",
-    "@angular/localize": "22.3.0-next.2",
+    "@angular/compiler": "22.3.0-next.4",
+    "@angular/compiler-cli": "22.3.0-next.4",
+    "@angular/localize": "22.3.0-next.4",
     "@types/node": "26.6.5",
     "tsrs": "0.16.0-ts7.1.0-dev.20260929",
     "typescript": "6.0.3",

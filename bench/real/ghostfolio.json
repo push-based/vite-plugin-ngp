@@ -4,7 +4,7 @@
   "repo": "https://github.com/ghostfolio/ghostfolio.git",
   "homepage": "https://github.com/ghostfolio/ghostfolio",
   "sha": "204f0d857ef258a2c090780bce8b69429a094f95",
-  "angularVersion": "22.3.0-next.2",
+  "angularVersion": "22.3.0-next.4",
   "install": [
     "npm install --legacy-peer-deps --min-release-age=0 --no-audit --no-fund"
   ],

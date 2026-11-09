@@ -82,15 +82,15 @@ Each entry records one choice: what we decided, why, what it costs, and when to 
 
 **Cost.** Projects still on Vite 7 or earlier can't use the plugin.
 
-## 8. Pin Angular to exactly 22.3.0-next.2
+## 8. Pin Angular to one exact prerelease
 
-*16 October 2026*
+*16 October 2026, moved to 22.3.0-next.4 on 6 November 2026*
 
-**Decision.** Every `@angular/*` dependency is pinned to `22.3.0-next.2`, the release built from ngp's commit `92e5aa8`.
+**Decision.** Every `@angular/*` dependency is pinned to the exact release built from the Angular commit ngp is built from. Today that's `22.3.0-next.4`, commit `b355f62`; [toolchain/versions.env](../toolchain/versions.env) holds both, and nothing that describes the current setup may name a different Angular version. A measured number keeps the version it was measured on, and says so, until it's measured again.
 
 **Why.** ngp's backend imports compiler-cli's private `hybrid_analysis` API, which has to come from the same commit.
 
-**Cost.** Moving to a newer Angular means rebuilding ngp at that commit and updating every pin together.
+**Cost.** Moving to a newer Angular means rebuilding ngp at that commit and updating every pin together. It isn't mechanical: the three weeks between `22.3.0-next.2` and `22.3.0-next.4` changed how the analyzer treats a file that comes back after a delete, which the plugin had to answer (decision 25), and gave ngp Angular's extended diagnostics, which the plugin now reports.
 
 ## 9. JIT fallback in the playground until there's a linker
 
@@ -128,7 +128,7 @@ Each entry records one choice: what we decided, why, what it costs, and when to 
 
 ## 12. Link libraries with Angular's Babel linker
 
-*16 October 2026. Replaces 9. Superseded by 63.*
+*16 October 2026. Replaces 9. Superseded by 65.*
 
 **Decision.** The plugin runs `createEs2015LinkerPlugin` from `@angular/compiler-cli/linker/babel` on every `node_modules` module that contains `ɵɵngDeclare`, except `@angular/core` and `@angular/compiler`. It runs as a Rolldown plugin in `optimizeDeps.rolldownOptions` for dev pre-bundling, and as a `transform` for builds and for deps that aren't pre-bundled. The playground no longer imports `@angular/compiler`.
 
@@ -301,6 +301,8 @@ The `ng build` row is the playground copied into a CLI project with an `angular.
 **Why.** The plugin used to ignore deletes. The analyzer keeps every file sent with `updateFileContent` in an in-memory overlay and never drops it, so after a delete it went on compiling importers against the deleted content, and Vite kept serving the importers' cached output: no error at all. `invalidateFiles` is the only call that drops the overlay. In ngp at `92e5aa8` it treats created, deleted and changed files alike, so the plugin uses it only for deletes and keeps `updateFileContent` for the rest. In the tests the analyzer's stale list did include the importers, but the plugin invalidates Vite's importers as well, so the error doesn't depend on that list being complete. Disk decides instead of the event type because on macOS, chokidar reported newly created files as `change` in the tests. The NG2008 check exists because ngp compiles a missing template to an empty one without a diagnostic, even in a fresh compiler. A deleted template would otherwise give a blank component. The reload after a failed compile is needed because the failed component isn't running in the browser, and an update sent to it changes nothing on the page.
 
 [file-changes.test.mjs](../packages/vite-plugin-ngp/test/file-changes.test.mjs) covers new components, deletes, renames, deleting a file that's still used, and new, deleted and repointed templates. It runs a real dev server and Vite's watcher, and checks against a fresh compiler. Run against the plugin before this change, four of its eight fail: the three that delete a file, and the `templateUrl` test, which points a component at a template before the file exists. Changing `templateUrl` to another file works too: the analyzer moves the component to the new template, and only edits to the new one update it. That's the case decision 23 hadn't tried. A `templateUrl` change still reloads, as decision 23 says.
+
+**Update, 6 November 2026 (Angular 22.3.0-next.4).** `updateType` is no longer ignored: `Created` and `Deleted` also make the analyzer resolve module specifiers and read the tsconfig's file list again, which `Changed` doesn't. So the plugin now sends `Created` for a file the watcher brings that it hasn't seen before. That alone isn't enough. Deleting a file drops the edge from each importer to it, so when the file comes back the analyzer reports only the file itself as stale and leaves every importer analyzed as it was, failed resolution and all: restoring a deleted component left `'app-greeting' is not a known element` on screen. The plugin remembers what the analyzer reported stale for the delete, and when the path returns it re-sends those files' content unchanged, which is the only way to ask for them to be analyzed again. Both cases are in [file-changes.test.mjs](../packages/vite-plugin-ngp/test/file-changes.test.mjs); they fail without it.
 
 **Cost.** One more private analyzer call, `invalidateFiles`, typed by hand. The NG2008 check reads the analyzer's metadata after every component compile. That cost isn't measured, but the analyzer has the metadata cached by then. The check is the plugin's, not Angular's, so its message can differ from ngc's in edge cases. Missing `styleUrl` files aren't checked.
 
@@ -750,7 +752,31 @@ A disk cache of the linker's output, keyed by file content and Angular version, 
 
 **Cost.** Someone who wants an ngp build from another Angular commit, the one reason left to set `toolchain`, finds how to make one only from the repo. The Benchmarks page still starts from `pnpm toolchain`, because reproducing the bench means running the repo.
 
-## 63. Link with a port of the CLI's oxc linker
+## 63. Specs run in Node on the server platform, not on jsdom
+
+*6 November 2026*
+
+**Decision.** The documented Vitest setup, and the playground's, is `environment: 'node'` with `@angular/platform-server/init` imported first and TestBed started on `ServerTestingModule` and `platformServerTesting()`. The DOM is Domino, the one `@angular/platform-server` renders with. jsdom stays documented as the alternative for an app that never renders on the server. Replaces the jsdom setup in [decision 28](#28-the-app-writes-the-testbed-setup-file); the app still writes the setup file.
+
+**Why.** A server-rendered app runs every component on Domino first, and a spec on jsdom never does: a component that reads `window` in its constructor passes its spec and fails the first server render. On the server platform the spec fails with the server's error. Nothing in the plugin had to change: Vitest runs `node` specs in a server environment, so `configEnvironment` already defines `ngServerMode` as `true` there, as for `main.server.ts`, and `test.server.deps.inline` already links `@angular/platform-server`. It's also faster: Vitest builds a jsdom window per spec file, and dropping it took the playground's warm run from 1.1–1.3 s to 0.58–0.61 s on an M2 Max.
+
+**Cost.** `ServerTestingModule` imports `@angular/platform-browser-dynamic/testing`, which `@angular/platform-server` doesn't declare, so an app without it installs one more package, and a deprecated one: npm says to use `@angular/platform-browser` instead, while Angular's own `ServerTestingModule` still imports it. Domino is a smaller DOM: `querySelectorAll` with a plain tag selector returns a non-iterable collection, `new MouseEvent(type)` loses its type, and there's no layout. Two of the playground's eleven tests hit the first two and were changed to `Array.from` and `new Event`. Both forms also work on jsdom. The [testing page](../site/content/testing.md) lists the gaps.
+
+**Revisit when** Vitest's browser mode is tried, which would test the browser half for real, or when Angular's platform-server replaces Domino.
+
+## 64. The playground runs its specs three ways: server platform, jsdom and browser mode
+
+*6 November 2026*
+
+**Decision.** `playground/vitest.config.ts` defines three Vitest projects over the same spec files: `server` (Node, `platformServerTesting`, [decision 63](#63-specs-run-in-node-on-the-server-platform-not-on-jsdom)), `jsdom` (`platformBrowserTesting`) and `browser` (Vitest browser mode on headless Chromium through `@vitest/browser-playwright`). Each has its own setup file in `src/testing/`. `pnpm test` runs all three, and CI installs Chromium with `npx playwright install --with-deps chromium` first. The plugin's filtered-run test passes `--project server`. The testing page documents each setup and compares them.
+
+**Why.** Users will arrive with specs written for one of the three, and the plugin should work for all of them without a mode of its own. It does: browser mode needed no plugin change either. Vite serves the specs to Chromium through the client environment, where `ngServerMode` is `false` and the dependency optimizer pre-bundles and links Angular's libraries as in the dev server. Running all three in CI is what makes "supported" mean something: a plugin change that breaks one of them fails the build. Warm, the playground's 11 tests take 0.42 s on the server platform, 0.78 s on jsdom and 0.85 s in Chromium on an M2 Max.
+
+**Cost.** The playground installs jsdom, Playwright and the provider, and CI downloads Chromium on every run, about 100 MB. Two specs had to avoid Domino's gaps to pass on all three. Only Chromium is run; Firefox and WebKit go untested.
+
+**Revisit when** the three setups diverge in what the plugin has to do, which would be the time for a plugin option, or when CI time for the browser download becomes a complaint.
+
+## 65. Link with a port of the CLI's oxc linker
 
 *9 November 2026. Replaces 12.*
 

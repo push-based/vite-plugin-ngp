@@ -52,9 +52,10 @@ export interface NgpPluginOptions {
    */
   tsconfig?: string;
   /**
-   * Entry modules, relative to Vite's root. Defaults to `src/main.ts`, plus `src/main.server.ts`
-   * when it exists. Under Vitest it defaults to none: the analyzer reads each spec, and what it
-   * imports, when Vitest asks for it.
+   * Entry modules, relative to Vite's root. Defaults to `src/main.ts`, `src/main.server.ts` and
+   * the `ssr` entry when one is named, each only when it exists. Setting it replaces that default,
+   * so list `src/main.ts` too. Under Vitest it defaults to none: the analyzer reads each spec, and
+   * what it imports, when Vitest asks for it.
    */
   entries?: string[];
   /**
@@ -72,8 +73,9 @@ export interface NgpPluginOptions {
    * Server-side rendering. Ignored under Vitest. The entry module default-exports
    * `render(url: string, document: string): Promise<string>`, which turns index.html into the
    * rendered page. In dev, the plugin renders every page request through it. `vite build` then
-   * builds the client into `dist/client` and the entry into `dist/server`. `true` means the entry
-   * is `src/main.server.ts`. Off by default.
+   * builds the client into `<build.outDir>/client` and the entry into `<build.outDir>/server`
+   * (`build.outDir` defaults to `dist`). `true` means the entry is `src/main.server.ts`. Off by
+   * default.
    */
   ssr?: boolean | {entry?: string};
   /**
@@ -241,6 +243,10 @@ function compilerPlugin(
   if (typeChecker !== 'tsgo' && typeChecker !== 'tsrs') {
     throw new Error(`[vite-plugin-ngp] typeChecker must be 'tsgo' or 'tsrs', not ${JSON.stringify(typeChecker)}`);
   }
+  const engine = options.engine ?? 'native';
+  if (engine !== 'native' && engine !== 'wasm') {
+    throw new Error(`[vite-plugin-ngp] engine must be 'native' or 'wasm', not ${JSON.stringify(engine)}`);
+  }
   let checker: TypeChecker | null = null;
   let devCheck: ReturnType<typeof startDevTypeCheck> | null = null;
   /** Requests and compiles in flight: the first type-check waits until there are none. */
@@ -365,7 +371,7 @@ function compilerPlugin(
           : await writeEntryTsconfig({tsconfig, entries, outDir: path.join(config.cacheDir, 'vite-plugin-ngp')});
       return NgpCompiler.create({
         toolchainDir,
-        engine: options.engine ?? 'native',
+        engine,
         tsconfig,
         analyzerTsconfig,
         enableHmr: hmr && consumer === 'client',
@@ -571,10 +577,7 @@ function compilerPlugin(
         ...(ssrEntry && {
           // `vite build` builds every environment: the browser bundle and the server entry.
           builder: {},
-          environments: {
-            client: {build: {outDir: 'dist/client'}},
-            ssr: {build: {outDir: 'dist/server', rolldownOptions: {input: ssrEntry}}},
-          },
+          environments: ssrEnvironments(userConfig, ssrEntry),
         }),
       };
     },
@@ -598,9 +601,14 @@ function compilerPlugin(
 
     configResolved(resolved) {
       config = resolved;
-      entries = (options.entries ?? (testing ? [] : ['src/main.ts', 'src/main.server.ts']))
-        .map((e) => path.resolve(config.root, e))
-        .filter((e) => options.entries || fs.existsSync(e));
+      // The default names the server entry too, so a custom `ssr.entry` gets its polyfills and
+      // i18n prelude without the app having to restate `src/main.ts` in `entries`.
+      if (options.entries) {
+        entries = options.entries.map((e) => path.resolve(config.root, e));
+      } else {
+        const defaults = testing ? [] : ['src/main.ts', 'src/main.server.ts', ...(ssrEntry ? [ssrEntry] : [])];
+        entries = [...new Set(defaults.map((e) => path.resolve(config.root, e)))].filter((e) => fs.existsSync(e));
+      }
       for (const {replace, with: replacement} of options.fileReplacements ?? []) {
         const from = path.resolve(config.root, replace);
         const to = path.resolve(config.root, replacement);
@@ -630,7 +638,6 @@ function compilerPlugin(
         });
         return;
       }
-      server.httpServer?.once('close', closeCompilers);
       if (typeCheck) {
         const viteHmr = server.config.server.hmr;
         typeCheckOverlay = viteHmr !== false && (typeof viteHmr !== 'object' || viteHmr.overlay !== false);
@@ -716,13 +723,20 @@ function compilerPlugin(
       config.logger.info(report.info);
     },
 
-    // Also runs when the dev server closes: a check still writing to the cache would outlive it.
-    // Vitest closes its Vite server through here, with no HTTP server to wait for.
+    // Also runs for each environment when the dev server closes: a check still writing to the cache
+    // would outlive it. A dev server's compilers close in closeServer, after every environment.
     async closeBundle() {
       await devCheck?.close();
-      if (config.command === 'build' || testing) {
+      if (config.command === 'build') {
         return closeCompilers();
       }
+    },
+
+    // Runs when a dev server closes or restarts, once every environment has finished its requests.
+    // That covers `vite dev`, Vitest's server, and middleware mode, which has no HTTP server to close.
+    // After a restart, the next request creates the compilers again.
+    closeServer() {
+      return closeCompilers();
     },
 
     // The dev server's overlay client for type errors.
@@ -791,7 +805,9 @@ function compilerPlugin(
           return null;
         }
         for (const d of result.diagnostics) {
-          const log = {message: `NG${d.code}: ${d.messageText}`, id: d.filePath ?? file, pos: d.span?.start};
+          // Extended diagnostics (NG81xx) already name their code in the message; the rest don't.
+          const prefixed = d.messageText.startsWith(`NG${d.code}:`) ? d.messageText : `NG${d.code}: ${d.messageText}`;
+          const log = {message: prefixed, id: d.filePath ?? file, pos: d.span?.start};
           // ts.DiagnosticCategory.Error
           if (d.category === 1) {
             this.error(log);
@@ -966,6 +982,21 @@ function linkerPlugin(): Plugin {
     },
     // Production builds, and dependencies Vite serves without pre-bundling.
     transform: {filter: LINKER_FILTER, handler: (code, id) => link(code, id) as never},
+  };
+}
+
+/**
+ * With `ssr`, the browser bundle goes to `<build.outDir>/client` and the server entry to
+ * `<build.outDir>/server`. An environment's own `build.outDir` wins over the top-level one, so
+ * these follow the app's `build.outDir`, and an outDir the app set on an environment is kept.
+ */
+function ssrEnvironments(userConfig: UserConfig, ssrEntry: string): UserConfig['environments'] {
+  const outDir = userConfig.build?.outDir ?? 'dist';
+  const outDirOf = (name: 'client' | 'ssr', folder: string) =>
+    userConfig.environments?.[name]?.build?.outDir ? {} : {outDir: path.join(outDir, folder)};
+  return {
+    client: {build: outDirOf('client', 'client')},
+    ssr: {build: {...outDirOf('ssr', 'server'), rolldownOptions: {input: ssrEntry}}},
   };
 }
 

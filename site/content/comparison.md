@@ -86,7 +86,7 @@ Angular libraries ship partially compiled, and every one of these tools has to l
 - **`@oxc-angular/vite`** has its own linker in Rust.
 - **vite-plugin-ngp** runs Angular's `FileLinker` over Vite's oxc parser, a port of the CLI's private pair, in pre-bundling, builds, server bundles and Vitest ([How it works](how-it-works#linking-libraries)).
 
-Until 9 November 2026 the plugin used Angular's public Babel linker, and that was the slow one: most of the plugin's cold start at 5,000 components is Vite pre-bundling Angular's packages, which runs the linker, and a restart skips it ([Performance](performance#starting-the-dev-server)). The oxc port links the same modules about three times faster in a direct comparison; the bench hasn't been rerun since ([decision 63](https://github.com/push-based/vite-plugin-ngp/blob/main/docs/decisions.md#63-link-with-a-port-of-the-clis-oxc-linker)).
+Until 9 November 2026 the plugin used Angular's public Babel linker, and that was the slow one: most of the plugin's cold start at 5,000 components is Vite pre-bundling Angular's packages, which runs the linker, and a restart skips it ([Performance](performance#starting-the-dev-server)). The oxc port links the same modules about three times faster in a direct comparison; the bench hasn't been rerun since ([decision 65](https://github.com/push-based/vite-plugin-ngp/blob/main/docs/decisions.md#65-link-with-a-port-of-the-clis-oxc-linker)).
 
 ## Maturity and installing it
 
@@ -95,7 +95,7 @@ This is where vite-plugin-ngp loses, plainly.
 - **The Angular CLI** is Angular's official toolchain.
 - **Analog** 2.8.1 is on npm and is a released, maintained project; 3.0 is in alpha. Its default path imports private `@angular/build` APIs, and Angular 22.2 broke it in three reported issues ([the bench's audit](https://github.com/push-based/ng-hybrid-preprocessor-bench/blob/main/docs/vite-plugin-analog-audit.md)).
 - **`@oxc-angular/vite`** 0.0.41 is on npm, with prebuilt binaries for macOS, Linux and Windows. Its README says it's "in an experimental stage and is actively seeking maintainers", and the launch post called it "an experiment for research purposes". Commits are still landing: the last on 16 October 2026.
-- **vite-plugin-ngp** 0.2.0 is on npm as `@push-based/vite-plugin-ngp`, first published on 21 October 2026. ngp isn't published, so the package carries its own build of it, made from Angular's source, with native engines for macOS and glibc Linux ([Getting started](getting-started)). Every Angular package is pinned to exactly `22.3.0-next.2`, a prerelease, because ngp's API isn't public and the plugin reaches below it in two places ([Status and limits](status#where-its-weakest)). It runs on macOS and Linux, and elsewhere with the slower wasm engine; Windows is untested.
+- **vite-plugin-ngp** 0.2.0 is on npm as `@push-based/vite-plugin-ngp`, first published on 21 October 2026. ngp isn't published, so the package carries its own build of it, made from Angular's source, with native engines for macOS and glibc Linux ([Getting started](getting-started)). Every Angular package is pinned to exactly `22.3.0-next.4`, a prerelease, because ngp's API isn't public and the plugin reaches below it in two places ([Status and limits](status#where-its-weakest)). It runs on macOS and Linux, and elsewhere with the slower wasm engine; Windows is untested.
 
 ## Which one to pick
 

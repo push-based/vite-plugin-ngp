@@ -41,6 +41,18 @@ test('zone.js apps: zone.js loads first and tracks async code, in the build', as
   assert.ok(!/\basync\s*(function\b|\(|[\w$]+\s*\()/.test(code), 'no async functions left');
 });
 
+test('zone.js apps: a server entry named in `ssr` gets zone.js/node without listing it in `entries`', async () => {
+  const root = await copyFixture('ng-build-app', 'zone-custom-server-entry');
+  await fs.rename(path.join(root, 'src/main.server.ts'), path.join(root, 'src/server.ts'));
+  await build(root, {polyfills: ['zone.js'], ssr: {entry: 'src/server.ts'}});
+
+  const code = await fs.readFile(path.join(root, 'dist/server/server.js'), 'utf8');
+  assert.ok(/^import "zone\.js\/node";/m.test(code), 'the server entry imports zone.js/node');
+  const server = await import(pathToFileURL(path.join(root, 'dist/server/server.js')).href);
+  // NG0908 without zone.js, as above.
+  assert.equal(await server.zoneAfterAwait('/', document), 'angular');
+});
+
 test('zone.js apps: without the async rewrite, code after `await` escapes the zone', async () => {
   const root = await copyFixture('ng-build-app', 'zone-control');
   await build(root, {polyfills: ['zone.js'], ssr: true}, {without: ['vite-plugin-ngp:zone-async']});
@@ -52,6 +64,7 @@ test('zone.js apps: zone.js loads first and tracks async code, in dev', async ()
   const root = await copyFixture('ng-build-app', 'zone-dev');
   const server = await createServer({
     root,
+    cacheDir: path.join(root, '.vite'),
     configFile: false,
     logLevel: 'silent',
     server: {middlewareMode: true, ws: false},

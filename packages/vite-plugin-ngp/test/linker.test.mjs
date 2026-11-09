@@ -1,5 +1,5 @@
 // The linker turns a library's partial declarations into runtime definitions, with Angular's
-// FileLinker over Vite's oxc parser (decision 63 in docs/decisions.md). Checked on a hand-written
+// FileLinker over Vite's oxc parser (decision 65 in docs/decisions.md). Checked on a hand-written
 // module and on Angular's own packages. Run `pnpm build` first.
 
 import assert from 'node:assert/strict';

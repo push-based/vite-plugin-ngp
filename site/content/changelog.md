@@ -17,6 +17,49 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 
 - The generated entry-only tsconfig in Vite's cache directory is now named by its content and moved into place after it's written whole. Two Vite processes on one project with different entries, a dev server next to a Vitest run, say, could overwrite each other's file or read a half-written one and fail with "Could not load the ng-exp-compiler analysis engine". [Configuration](configuration)
 
+## 7 November 2026
+
+### Configuration
+
+- An `engine` that is neither `'native'` nor `'wasm'` now fails startup with a message naming both, like a wrong `typeChecker` does. Before, any value other than `'native'` quietly loaded the single-threaded wasm analyzer, so a typo like `'natve'` made every compile slower with no error. [Configuration](configuration)
+
+### Docs
+
+- [Configuration](configuration#when-to-change-them) and [Status and limits](status#where-its-weakest) now give the same type-check figures as [Type-checking](type-checking#checking-with-tsrs) and [Performance](performance#type-errors-in-the-dev-server), from the rerun: on the 5,000-component app a planted template error reaches the terminal in 1.36 s with `tsgo` and 1.02 s with tsrs. They still carried 1.56 s and 1.12 s from the single earlier run, and 1.45 s.
+- The compile-time globals table in [How it works](how-it-works#compile-time-globals) now says `ngHmrMode` is `false` in builds, in server environments, under Vitest and with `hmr: false`, not only under Vitest.
+
+### i18n
+
+- `ngp-extract-i18n` with a flag it doesn't know, such as `--out`, or a flag missing its value, now prints which flag was wrong and the usage text, and exits 1, instead of a Node stack trace. A `--duplicates` value other than `error`, `warning` or `ignore` is an error too, where before it acted as `warning`. [Internationalization](i18n#extract-the-messages)
+
+### Dev server
+
+- Closing a dev server in middleware mode, the setup for hosting Vite inside your own Node server, now closes the ngp compilers. The plugin closed them when Vite's HTTP server closed, and middleware mode has none, so the analyzers and their threads outlived `vite.close()`. They now close when Vite closes the server, with or without an HTTP server. [Server rendering](server-rendering#what-the-plugin-does)
+
+### Server rendering
+
+- A server entry named in `ssr: {entry: 'src/server.ts'}` is now in the default `entries`, so it gets `zone.js/node`, your other `polyfills` and the `i18n` prelude. Before, only `src/main.ts` and `src/main.server.ts` were, and a zone.js app with a custom server entry failed to bootstrap on the server unless you set `entries`, which replaces the whole default. [Configuration](configuration#when-to-change-them)
+- With `ssr`, `vite build` now writes the browser bundle to `<outDir>/client` and the server entry to `<outDir>/server`, following your `build.outDir`. It used to write `dist/client` and `dist/server` whatever `build.outDir` said. Without a `build.outDir` nothing moves, and an `outDir` you set on the `client` or `ssr` environment is kept. [Server rendering](server-rendering#what-the-plugin-does)
+
+## 6 November 2026
+
+### Testing
+
+- The documented Vitest setup now runs specs in Node on the server platform: `environment: 'node'`, `@angular/platform-server/init` and `ServerTestingModule`. The DOM is Domino, the one Angular renders with on the server, so a component that passes its spec also renders on the server, and a warm run of the playground's 11 tests went from 1.1–1.3 s to 0.58–0.61 s without jsdom's window setup. Domino is smaller than jsdom: spread `querySelectorAll` results with `Array.from`, and dispatch `new Event(type)` rather than `new MouseEvent(type)`. jsdom is still documented as the alternative. [Testing with Vitest](testing#why-the-server-platform)
+- Vitest's browser mode works too, on headless Chromium through `@vitest/browser-playwright`, with the same specs and the jsdom setup file. The playground now runs its specs all three ways, as three Vitest projects, and the page compares them. [Testing with Vitest](testing#which-to-pick)
+
+### Angular
+
+- The plugin moved from Angular `22.3.0-next.2` to `22.3.0-next.4`, and the ngp it carries is built from the commit that release was cut at. Move every `@angular/*` package in your app with it: the pin is still exact, because ngp imports private APIs from `@angular/compiler-cli`. [Getting started](getting-started)
+
+### Type-checking
+
+- ngp now runs Angular's extended diagnostics, the NG81xx template checks `ng build` reports, so an uninvoked signal in an interpolation or a unitless CSS length is a warning in your terminal while the module compiles. They come out of the compile, not the type-check pass, so you get them with `typeCheck: false` too, and your tsconfig's `angularCompilerOptions.extendedDiagnostics` decides their severity. A check name or category that doesn't exist fails startup with Angular's message, instead of turning every extended check off in silence. [Type-checking](type-checking#angulars-extended-diagnostics)
+
+### Dev server
+
+- Restoring a file you deleted recovers again. The newer analyzer drops the edge from an importer to a file it's told was deleted, so a restored component stayed "not a known element" until the importer was edited; the plugin now tells the analyzer about created files and re-analyzes the importers itself. [How it works](how-it-works#handling-an-edit)
+
 ## 21 October 2026
 
 ### Packaging

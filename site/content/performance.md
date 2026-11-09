@@ -11,7 +11,7 @@ This page is for you if you're deciding whether to try vite-plugin-ngp instead o
 
 ## What was measured
 
-Four toolchains, each with its own README's setup and nothing else, on the same apps, with the same Angular, `22.3.0-next.2`, plus the plugin a second time with its opt-in [`typeChecker: 'tsrs'`](type-checking#checking-with-tsrs), which swaps `tsgo` for Oxc's Rust port of TypeScript 7:
+Four toolchains, each with its own README's setup and nothing else, on the same apps, with the same Angular, `22.3.0-next.2`, the version ngp was built from when this ran, plus the plugin a second time with its opt-in [`typeChecker: 'tsrs'`](type-checking#checking-with-tsrs), which swaps `tsgo` for Oxc's Rust port of TypeScript 7:
 
 | Toolchain | Version | Type-checks? |
 |---|---|---|

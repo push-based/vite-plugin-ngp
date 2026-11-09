@@ -13,9 +13,9 @@ This page takes you from an Angular app to the same app served by Vite through v
 |---|---|
 | Operating system | macOS (arm64 or x64) or Linux with glibc (x64 or arm64), WSL 2 included. Anywhere else, Alpine included, set `engine: 'wasm'` ([Configuration](configuration)). Windows itself is untested |
 | Node | 26 |
-| Angular | Exactly `22.3.0-next.2` |
+| Angular | Exactly `22.3.0-next.4` |
 
-You don't need Rust or a clone of the repo. Angular hasn't published ngp, so the package carries its own build of it, made from Angular's source at the commit behind `22.3.0-next.2`, with a native engine for each platform above.
+You don't need Rust or a clone of the repo. Angular hasn't published ngp, so the package carries its own build of it, made from Angular's source at the commit behind `22.3.0-next.4`, with a native engine for each platform above.
 
 ## 1. Install the plugin
 
@@ -26,19 +26,19 @@ npm install -D @push-based/vite-plugin-ngp vite@8.3.4
 With pnpm, `pnpm add -D` takes the same two packages.
 
 > [!WARNING]
-> Pin every `@angular/*` package to exactly `22.3.0-next.2`, the release built from the same commit as ngp. Any other version fails, because ngp imports private APIs from `@angular/compiler-cli`.
+> Pin every `@angular/*` package to exactly `22.3.0-next.4`, the release built from the same commit as ngp. Any other version fails, because ngp imports private APIs from `@angular/compiler-cli`.
 
 ```json title="package.json"
 {
   "dependencies": {
-    "@angular/common": "22.3.0-next.2",
-    "@angular/compiler": "22.3.0-next.2",
-    "@angular/core": "22.3.0-next.2",
-    "@angular/platform-browser": "22.3.0-next.2",
-    "@angular/router": "22.3.0-next.2"
+    "@angular/common": "22.3.0-next.4",
+    "@angular/compiler": "22.3.0-next.4",
+    "@angular/core": "22.3.0-next.4",
+    "@angular/platform-browser": "22.3.0-next.4",
+    "@angular/router": "22.3.0-next.4"
   },
   "devDependencies": {
-    "@angular/compiler-cli": "22.3.0-next.2",
+    "@angular/compiler-cli": "22.3.0-next.4",
     "typescript": "6.0.3"
   }
 }

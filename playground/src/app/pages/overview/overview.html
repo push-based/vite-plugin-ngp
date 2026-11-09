@@ -46,7 +46,8 @@
 
 <section aria-labelledby="features-title">
   <h2 id="features-title" class="section-title" i18n>Demos</h2>
-  <!-- An ICU inside @if inside @for fails Angular's i18n hydration (22.3.0-next.2), so this one
+  <!-- An ICU inside @if inside @for fails Angular's i18n hydration (last checked on
+       22.3.0-next.2), so this one
        sits outside control flow. ngc compiles that case the same way ngp does. -->
   <p class="muted lede" i18n>{features.length, plural, =1 {One page, each compiled on first visit.} other {{{ features.length }} pages, each compiled on first visit.}}</p>
   <div class="features">

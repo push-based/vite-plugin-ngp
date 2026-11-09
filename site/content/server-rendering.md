@@ -18,7 +18,7 @@ export default defineConfig({
 });
 ```
 
-`ssr: true` expects the server entry at `src/main.server.ts`. To use another file, write `ssr: {entry: 'src/server.ts'}`.
+`ssr: true` expects the server entry at `src/main.server.ts`. To use another file, write `ssr: {entry: 'src/server.ts'}`. That file joins the default [`entries`](configuration#when-to-change-them), so it gets `zone.js/node` and your other `polyfills` without listing it there. If you do set `entries`, it replaces the default: list the server entry and `src/main.ts` both.
 
 ## The server entry
 
@@ -55,13 +55,15 @@ provideClientHydration(withEventReplay())
 
 **In the dev server**, a middleware renders every page request through your entry, loaded by Vite's `ssr` environment. It passes the entry `index.html` as Vite transformed it, and returns the rendered page for the browser to hydrate. Edit a template and the browser updates in place, while the next server render shows the edit too.
 
+This works in Vite's middleware mode too, when your own Node server mounts `vite.middlewares` (`server: {middlewareMode: true}`), and `vite.close()` shuts down the ngp compilers there as it does for `vite dev`. Leave `appType` at its default, `'spa'`: the middleware renders the requests Vite's SPA fallback rewrites to `index.html`, and with `appType: 'custom'` there's no fallback, so a request for `/` never reaches it and your server has to call `render` itself.
+
 The server's Angular libraries are pre-bundled and cached, like the browser's. Vite leaves `node_modules` to Node in server environments and turns its dependency optimizer off there, so without this every Angular package was linked and transformed again on each start. The plugin turns the optimizer on for the `ssr` environment, scanning your server entry, and the linked bundle lives in `node_modules/.vite/deps_ssr` next to the browser's `deps`. It's rebuilt when the lockfile or the Vite config changes, when a library is first imported while the server runs, or with `vite --force`; `DEBUG=vite:deps` shows when. Only Angular libraries go into the bundle: rxjs and everything else they import stay with Node, so your app and the bundle share one copy. On the playground, a warm restart's first page went from 1.3 s to 0.74 s with the cache, measured on 17 October 2026 on an M2 Max as the median of six restarts. The first start after an install pays about 0.35 s to build the bundle.
 
 One thing you give up: the server bundle has no source maps, because Vite read and combined them on every start, about 170 ms of the playground's first page. A server stack trace from inside Angular points into the readable, unminified file under `deps_ssr`, not into `@angular/core/fesm2022`. Your own modules keep their maps.
 
 **In server environments**, the plugin compiles your components with their own ngp compiler, without HMR code, because HMR code imports updates from URLs only a browser can load. It defines `ngServerMode` as `true`. It also bundles every Angular library into the server build and links it: `@angular/*`, plus every package in your `dependencies` that depends on `@angular/core`, such as Angular Material or NgRx. Vite usually leaves `node_modules` for Node to load, and Node would load those libraries unlinked, which only works with the JIT compiler. An Angular library listed under `devDependencies` isn't found; add it to `resolve.noExternal` yourself.
 
-**In `vite build`**, it builds both environments: the browser bundle into `dist/client`, and your entry into `dist/server/main.server.js`. Serving them is up to you, with any Node server that calls `render` for page requests and serves `dist/client` for everything else. With the `i18n` option, both folders get one subfolder per locale, such as `dist/server/de/main.server.js`, and your server picks the bundle by the URL's first segment. [Internationalization](i18n#serving-the-locales) has the details.
+**In `vite build`**, it builds both environments: the browser bundle into `<outDir>/client`, and your entry into `<outDir>/server/main.server.js`, where `<outDir>` is your `build.outDir` and defaults to `dist`. With the default, that's `dist/client` and `dist/server`, the paths the rest of this page uses. An `outDir` you set on the `client` or `ssr` environment itself wins over both. Serving them is up to you, with any Node server that calls `render` for page requests and serves `dist/client` for everything else. With the `i18n` option, both folders get one subfolder per locale, such as `dist/server/de/main.server.js`, and your server picks the bundle by the URL's first segment. [Internationalization](i18n#serving-the-locales) has the details.
 
 ## Prerendering for static hosting
 

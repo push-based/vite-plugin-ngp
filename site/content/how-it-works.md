@@ -63,7 +63,7 @@ In the dev server, each stylesheet is a `<link>` the runtime adds, and an edit r
 
 ## Type-checking
 
-Compiling a module doesn't check its types. Separately, after startup and after each edit, the plugin asks ngp for a type-check block per component file, and runs TypeScript 7 over your app and those blocks in another process. It maps errors in a block back to your template. [Type-checking](type-checking) has the details.
+Compiling a module doesn't check its types. Separately, after startup and after each edit, the plugin asks ngp for a type-check block per component file, and runs TypeScript 7 over your app and those blocks in another process. It maps errors in a block back to your template. Angular's extended diagnostics, the NG81xx template checks, do come out of the compile itself, as warnings. [Type-checking](type-checking) has the details.
 
 ## Linking libraries
 
@@ -88,7 +88,7 @@ The plugin defines the same globals the Angular CLI does, so the minifier can dr
 | `ngJitMode` | `false` everywhere, since the linker makes every library ahead-of-time compiled |
 | `ngDevMode` | `false` in builds |
 | `ngServerMode` | `false` in the browser, `true` in server environments |
-| `ngHmrMode` | `true` in the dev server's browser environment, `false` under Vitest |
+| `ngHmrMode` | `true` in the dev server's browser environment, `false` in builds, server environments, under Vitest and with `hmr: false` |
 | `ngI18nClosureMode` | `false` everywhere, so i18n messages compile to `$localize` calls, never Closure's `goog.getMsg` |
 
 These took the playground's bundle from 589 kB to 386 kB, and stopped production builds from logging "Angular is running in development mode".

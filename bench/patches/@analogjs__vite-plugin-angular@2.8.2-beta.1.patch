@@ -7,7 +7,7 @@ index e4d95a5bb1fd47e42efcc0e7e45aaac44ca4b3d1..42835b85fb6efe1c87297ded3387c53f
  const angularMajor = Number(VERSION.major);
  const angularMinor = Number(VERSION.minor);
 -const angularPatch = Number(VERSION.patch);
-+// Patched for the benchmark: Number('0-next.2') is NaN, which turned off the 22.2+ code path on
++// Patched for the benchmark: Number('0-next.4') is NaN, which turned off the 22.2+ code path on
 +// prerelease Angular versions.
 +const angularPatch = parseInt(VERSION.patch, 10);
  const padVersion = (version) => String(version).padStart(2, '0');

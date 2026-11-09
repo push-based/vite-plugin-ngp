@@ -35,11 +35,14 @@ export function recordingLogger() {
 
 /**
  * Runs `vite build` on `root` with the plugin and `options`. `without` names plugins to leave out,
- * to show what goes wrong without them.
+ * to show what goes wrong without them. `config` is more Vite config, such as `build`.
  */
-export async function build(root, options, {without = [], logger} = {}) {
+export async function build(root, options, {without = [], logger, config = {}} = {}) {
   const plugins = ngp({toolchain, ...options}).filter((p) => !without.includes(p.name));
-  const builder = await createBuilder({root, configFile: false, logLevel: 'silent', customLogger: logger, plugins});
+  // Its own cache: without it Vite falls back to the repo root's node_modules/.vite, which
+  // every parallel test file would then share, including the type-check tsconfig written there.
+  const cacheDir = path.join(root, '.vite');
+  const builder = await createBuilder({...config, root, cacheDir, configFile: false, logLevel: 'silent', customLogger: logger, plugins});
   await builder.buildApp();
 }
 
