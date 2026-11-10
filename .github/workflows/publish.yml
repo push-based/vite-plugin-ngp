@@ -32,6 +32,51 @@ permissions:
   contents: read
 
 jobs:
+  # Asks npm, the way `npm publish` does, whether it accepts this workflow as the package's trusted
+  # publisher, and prints npm's answer. npm only logs a refusal at its verbose level, so without
+  # this a wrong setting on npmjs.com shows up as ENEEDAUTH at the last step, with no reason. It
+  # runs in a dry run too. Nothing waits for it: the first release has to build its tarball before
+  # npm knows the package.
+  trust:
+    name: Check npm trusts this workflow
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - name: Exchange a GitHub OIDC token with npm
+        env:
+          PACKAGE: '@push-based/vite-plugin-ngp'
+        run: |
+          node --input-type=module <<'EOF'
+          const {ACTIONS_ID_TOKEN_REQUEST_URL: url, ACTIONS_ID_TOKEN_REQUEST_TOKEN: bearer, PACKAGE: name} = process.env;
+          if (!url || !bearer) {
+            console.error('GitHub gave this job no OIDC token: it needs `permissions: id-token: write`.');
+            process.exit(1);
+          }
+          const github = await fetch(`${url}&audience=npm:registry.npmjs.org`, {headers: {Authorization: `Bearer ${bearer}`}});
+          const idToken = (await github.json()).value;
+          if (!idToken) {
+            console.error(`GitHub refused an OIDC token for npm: HTTP ${github.status}.`);
+            process.exit(1);
+          }
+          const claims = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64url').toString());
+          console.log('What this run presents to npm, to compare with the trusted publisher on npmjs.com:');
+          for (const claim of ['repository', 'workflow_ref', 'environment', 'ref', 'runner_environment']) {
+            console.log(`  ${claim}: ${claims[claim]}`);
+          }
+          const exchange = `https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${name.replace('/', '%2f')}`;
+          const npm = await fetch(exchange, {method: 'POST', headers: {Authorization: `Bearer ${idToken}`}});
+          const body = await npm.json().catch(() => ({}));
+          if (npm.ok && body.token) {
+            console.log(`::add-mask::${body.token}`);
+            console.log(`npm accepts this workflow as a trusted publisher of ${name}.`);
+          } else {
+            console.error(`npm refused this workflow for ${name}: HTTP ${npm.status}, ${body.message ?? JSON.stringify(body)}`);
+            process.exit(1);
+          }
+          EOF
+
   native:
     name: Build ngp (${{ matrix.platform }})
     strategy:
