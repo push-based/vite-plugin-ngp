@@ -49,6 +49,8 @@ In the dev server, ngp compiles each component with the same HMR code the Angula
 
 The component keeps its state: a counter at 2 stays at 2 while its heading changes. If the runtime can't apply an update, it says so, and the plugin reloads the page.
 
+The `<id>` is the component's file and class name, the way Angular's compiler writes it into the compiled component: the path from the folder that holds your tsconfig for a file inside it, and the file's full path for one outside, like `libs/ui` next to `apps/landing` in a monorepo. Both update in place. Vite only watches its `root`, though, so an edit to a library outside it reaches the plugin only if your config adds the folder to the watcher, with `server.watcher.add()` from a plugin's `configureServer` hook.
+
 For a `.ts` edit, the plugin decides with the same rules as the Angular CLI's dev server. It compares the file before and after the edit, as text. If the only difference is inside the `template` or `styles` value of a component's decorator, those components update in place. In a file with several components, only the ones you edited update. Any other difference reloads the page: a new entry in `imports`, a changed `selector`, an input, a method, an import or a constant at the top of the file. An update can't bring in code the running page doesn't have yet, so those need the reload.
 
 The comparison is strict, and that's deliberate. It doesn't try to tell a harmless change from a real one, so reformatting a method reloads too. Two cases update in place under `ng serve` and reload here: a template kept in a constant outside the decorator, which is a top-level change, and an edit to `templateUrl` or `styleUrl`.

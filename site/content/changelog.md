@@ -7,6 +7,12 @@ description: What changed in vite-plugin-ngp, newest first, for anyone following
 
 What changed in vite-plugin-ngp, newest first, written for people using it. Every entry links to the page that documents it. Versions on npm, with the commits in each, are in the repo's [CHANGELOG.md](https://github.com/push-based/vite-plugin-ngp/blob/main/CHANGELOG.md) and its [GitHub releases](https://github.com/push-based/vite-plugin-ngp/releases).
 
+## 10 November 2026
+
+### Fixes
+
+- A template edit now updates in place for a component outside the folder that holds the app's tsconfig, such as a library next to the app in a monorepo. The plugin sent the update under a path relative to that folder (`../../libs/ui/...`), while the compiled component listens for its full path, so the page ignored the update until a reload. [How it works](how-it-works#component-hmr)
+
 ## 9 November 2026
 
 ### Builds

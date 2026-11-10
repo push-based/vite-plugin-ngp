@@ -474,11 +474,15 @@ export class NgpCompiler {
   }
 
   /**
-   * Angular's HMR id for a component: `encodeURIComponent('<path from rootDir>@<ClassName>')`,
-   * the same id the compiled component's HMR initializer listens for.
+   * Angular's HMR id for a component: `encodeURIComponent('<path>@<ClassName>')`, the same id
+   * the compiled component's HMR initializer listens for. The path is relative to rootDir for a
+   * file inside it and the file's own path for one outside, such as a library next to the app in
+   * a monorepo: that is how ngp's `getHmrFilePath` picks it, as ngtsc does.
    */
   componentId(tsFile: string, className: string): string {
-    return encodeURIComponent(`${this.relative(tsFile)}@${className}`);
+    const relative = this.relative(tsFile);
+    const file = relative.startsWith('..') || path.isAbsolute(relative) ? tsFile : relative;
+    return encodeURIComponent(`${file}@${className}`);
   }
 
   close(): void {
