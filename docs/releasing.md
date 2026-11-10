@@ -29,6 +29,8 @@ The package's `prepack` script refuses to pack unless all four native engines ar
 
 To check the whole build without publishing, run **Publish** by hand with **Dry run** ticked. It does everything above except the upload to npm, and the tarball artifact is what a release would publish. A first run takes about as long as CI's cold build on each runner, around 8 minutes. After that the Rust caches make it faster.
 
+Every Publish run, dry or not, starts with a job named **Check npm trusts this workflow**. It asks npm the question `npm publish` asks, whether this workflow is the package's trusted publisher, and prints what the run presents (`repository`, `workflow_ref`, `environment`) next to npm's answer. It takes about 20 seconds and nothing waits for it. Read it when the upload fails with `ENEEDAUTH`: npm reports a refused exchange only at its verbose log level, so the publish step gives no reason. `OIDC token exchange error - package not found` means npm has no trusted publisher for the package that matches those values: none was saved, or a field differs from the table below.
+
 To preview a release on CI, run **Release** with **Dry run** ticked. It prints the version and changelog it would make and pushes nothing. It also checks that the bot's token can push to the repo, so it's the way to test `GH_APP_ID` and `GH_APP_PRIVATE_KEY` after setting them up. It doesn't test the bypass of `main`'s branch protection, because GitHub only checks that on a real push.
 
 To preview a release locally without changing anything:
