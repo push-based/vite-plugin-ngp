@@ -28,6 +28,7 @@ A first version on top of a prototype compiler. Everything below was checked in 
 - Angular i18n: extraction, and one translated folder per locale from a single build.
 - Vitest with TestBed, compiling only the specs a run asks for.
 - `fileReplacements`, `budgets` and `polyfills` from angular.json, and one app at a time in an Nx workspace.
+- Builds and test runs reuse compiled output from the last run, for every module whose inputs haven't changed.
 
 **Not yet:** preprocessors in inline `styles`, HTTP status codes from SSR, the service worker, library builds, and Windows outside WSL 2, which is untested.
 

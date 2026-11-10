@@ -9,6 +9,9 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 
 ## 9 November 2026
 
+### Builds
+
+- `vite build` and Vitest now keep compiled output between runs, under Vite's `cacheDir`, and skip ngp's code generation, the linker and the build optimizer for every module whose code, templates, stylesheets and used components are unchanged. A new `cache` option, on by default, turns it off. The dev server doesn't use it. On the 5,000-component app, measured on a loaded laptop, a build without type-checking went from 48 s cold to 16 s warm. [How it works](how-it-works#reusing-output-between-builds), [Configuration](configuration)
 ### Linking libraries
 
 - The linker no longer runs through Babel. The plugin drives Angular's `FileLinker` over Vite's oxc parser, a port of the pair the CLI keeps private, and splices each linked definition into the module in place. On the 21 partially compiled modules of Angular's own packages it's about three times faster warm and eight times on the first module, measured in one process, not on the bench. The output is the same; a declaration's constants now sit in a pure IIFE around its definition instead of at module scope. `@babel/core` is gone from the package's dependencies. [How it works](how-it-works#linking-libraries), [Status and limits](status#where-its-weakest)

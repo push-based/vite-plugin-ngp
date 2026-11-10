@@ -64,7 +64,8 @@ export interface HybridCompiler {
   readonly analyzer: Analyzer;
   /** Per-file analysis cache, keyed by the analyzer's file path. */
   readonly fileCache: Map<string, unknown>;
-  processFile(filePath: string, content: string): Promise<ProcessedFile>;
+  /** `metadata` is the analyzer's result for the file, if already fetched; ngp looks it up otherwise. */
+  processFile(filePath: string, content: string, metadata?: NonNullable<Awaited<ReturnType<Analyzer['getMetadataForFile']>>>): Promise<ProcessedFile>;
   /** The update module for one component, as TypeScript, or null if HMR is off. */
   emitHmrUpdateModule(filePath: string, className: string): Promise<string | null>;
   /**

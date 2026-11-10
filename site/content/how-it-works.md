@@ -125,3 +125,32 @@ Measured on the repo's playground, with the same script for each build (raw size
 On this site, the first page's JavaScript went from 462 kB to 298 kB (143 kB to 93 kB gzipped). Taken as a whole, the plugin's output is now as big as `ng build`'s for the same app: 2% larger raw, the same size gzipped. The first page is smaller than `ng build`'s only because Rolldown splits chunks differently from esbuild.
 
 The pass trusts what the CLI trusts: that no top-level code in Angular's packages runs for its side effects. And it's a copy, so when the CLI changes its pass, the plugin's stays as it was until someone ports the change.
+
+## Reusing output between builds
+
+Building the 5,000-component app spends most of its time transforming modules: 14.6 of 16.6 seconds without type-checking, and most of that is ngp's code generation, which is Angular's template compiler in TypeScript ([Performance](performance#production-builds)). Every build paid it in full, and in an Nx workspace every app build paid it again for every library file.
+
+Since 9 November 2026, `vite build` and Vitest keep what they compiled, under Vite's `cacheDir`, at `node_modules/.vite/vite-plugin-ngp/cache` by default. Three things are kept, one entry per module, each named by a hash of what its output depends on:
+
+- **ngp's output** for one of your modules. The hash covers the ngp build, the plugin's own code, the Angular compiler's version, the project's root and every option that reaches ngp; the module's path and its code as Vite hands it over; the content of its external templates and stylesheets; and the analyzer's metadata for the file. That metadata carries the selector, inputs, outputs, standalone flag and host directives of every component, directive and pipe the module's templates use, and the value of every constant its decorators read. So adding an input to a child component recompiles its parents, and editing a comment in the child's file doesn't.
+- **The linker's output** for a library module in `node_modules`, by the file and its content.
+- **The build optimizer's output**, by the module's code and its package's `sideEffects` setting.
+
+The analyzer runs on every build either way, because the hash needs its metadata. That's the Rust part, and the cheap one. What a hit skips is the TypeScript code generation, the build optimizer and, for libraries, the linker. Diagnostics are kept with the output, so a warning repeats on a hit as it would on a compile. A missing template file is never cached, since that compile has to report NG2008.
+
+The dev server doesn't use the cache. It compiles only what the page asks for, and a restart on the 5,000-component app already paints in 0.57 seconds, most of it Vite's own dependency pre-bundling, which Vite caches itself.
+
+What it saves, measured on 9 November 2026 on an M4 Max laptop that was running other work at the time, so the cold figures are two to three times the Performance page's and vary by up to 40% between runs. Each row is the median of 3 builds in one session, cold with the cache deleted first, warm straight after, so only the two columns of one row compare. They were taken with the Babel linker the plugin used until that day, so the cold column includes it:
+
+| App | Cold | Warm, nothing changed |
+|---|---:|---:|
+| 1,000 components, `typeCheck: false` | 6.1 s | 2.4 s |
+| 5,000 components, `typeCheck: false` | 48 s | 16 s |
+| 5,000 components, type-checked | 82 s | 55 s |
+| playground, with SSR, i18n and type-checking | 3.7 s | 2.1 s |
+
+On the 5,000-component app a warm build after one template edit took as long as a warm build with nothing changed, 57 s against 55, which is inside the run-to-run noise: one module compiles and the rest hit. The type-check doesn't shrink, because it checks the whole program every time, so a type-checked warm build is bounded by it. The cache is big: 50 MB for the 1,000-component app and 219 MB for 5,000, most of it source maps, and nothing prunes it. These numbers weren't taken with the bench harness; the [Performance](performance#production-builds) page's will be, in a later rerun.
+
+To see what a build reused, set `DEBUG=vite-plugin-ngp`: each module is logged as `compiled`, `reused` or `unchanged`, and the build ends with the hit and miss count. `cache: false` turns it off ([Configuration](configuration#when-to-change-them)).
+
+Where it's weak: a hash with a missing input would serve a wrong module with no error. The repo has a test for each kind of input, from a template edit to a new input on a used component, and the metadata the key hashes is the analyzer's whole result for the file, with only its run-specific ids and spans removed. If a build ever comes out stale, `cache: false` is the check, and the key is the bug.

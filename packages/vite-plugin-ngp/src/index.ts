@@ -22,6 +22,7 @@ import {i18nPlugin, type I18nOptions} from './i18n.js';
 import {link, LINKER_MARKER} from './linker.js';
 import {isSideEffectFree, optimize, OPTIMIZER_CANDIDATE} from './optimizer.js';
 import {resolveToolchain, type Engine} from './ngp-api.js';
+import {cacheScope, OutputCache} from './output-cache.js';
 import {polyfillsPlugin, usesZone, zoneAsyncPlugin} from './polyfills.js';
 import {
   buildReport,
@@ -114,12 +115,20 @@ export interface NgpPluginOptions {
    * default: without it, `$localize` messages need `@angular/localize/init` loaded by the app.
    */
   i18n?: I18nOptions;
+  /**
+   * Keep compiled output between runs, under Vite's `cacheDir`, so `vite build` and Vitest skip
+   * ngp's code generation, the linker and the build optimizer for every module whose inputs are
+   * unchanged. The dev server never uses it. Defaults to true.
+   */
+  cache?: boolean;
 }
 
 /** What the compiler plugin shares with the other plugins. */
 interface CompilerApi extends StylesPluginContext {
   /** The entry modules, as absolute paths. */
   entries(): string[];
+  /** The output cache, in builds and under Vitest with the `cache` option on. Null otherwise. */
+  cache(): OutputCache | null;
   /** Each component stylesheet in an app module, from the browser compiler's analyzer. */
   componentStyles(file: string): Promise<ComponentStyle[]>;
 }
@@ -206,8 +215,8 @@ export function ngp(options: NgpPluginOptions = {}): Plugin[] {
     // Measures component stylesheets before the styles plugin scopes them.
     ...(options.budgets?.length ? [budgetsPlugin(options.budgets, compiler.api)] : []),
     stylesPlugin(compiler.api),
-    linkerPlugin(),
-    optimizerPlugin(),
+    linkerPlugin(compiler.api),
+    optimizerPlugin(compiler.api),
     ...(polyfills.length > 0 ? [polyfillsPlugin(polyfills, () => compiler.api.entries())] : []),
     ...(usesZone(polyfills) ? [zoneAsyncPlugin()] : []),
     ...(options.i18n ? [i18nPlugin(options.i18n, () => compiler.api.entries(), !!options.ssr && !isVitest())] : []),
@@ -219,6 +228,7 @@ function compilerPlugin(
   replacements: Replacements,
 ): Plugin<CompilerApi> & {api: CompilerApi; configureVitest(context: VitestPluginContext): void} {
   let config: ResolvedConfig;
+  let cache: OutputCache | null = null;
   let vitest: VitestPluginContext['vitest'] | null = null;
   let entries: string[] = [];
   /**
@@ -376,6 +386,7 @@ function compilerPlugin(
         analyzerTsconfig,
         enableHmr: hmr && consumer === 'client',
         fileReplacements: replacements.byFile,
+        cache: cache ?? undefined,
       });
     })();
     compilers.set(consumer, compiler);
@@ -542,6 +553,7 @@ function compilerPlugin(
       hmr: () => hmr,
       linkStyles: () => config.command === 'serve' && !testing,
       entries: () => entries,
+      cache: () => cache,
       async componentStyles(file) {
         const compiler = compilers.get('client');
         return compiler ? (await compiler).componentStyles(file) : [];
@@ -601,6 +613,11 @@ function compilerPlugin(
 
     configResolved(resolved) {
       config = resolved;
+      // Builds and test runs reuse output from the last run. The dev server compiles what the
+      // page asks for, and a restart is already fast, so it stays out (decision 66).
+      if (options.cache !== false && (config.command === 'build' || testing)) {
+        cache = new OutputCache(path.join(config.cacheDir, 'vite-plugin-ngp/cache'), cacheScope(config.root));
+      }
       // The default names the server entry too, so a custom `ssr.entry` gets its polyfills and
       // i18n prelude without the app having to restate `src/main.ts` in `entries`.
       if (options.entries) {
@@ -625,7 +642,8 @@ function compilerPlugin(
       vitest = context.vitest;
       // Vitest caches transformed modules on disk, keyed by the module's own content. A compiled
       // component also depends on its template, its styles, and the components it imports, so
-      // the app's modules are compiled fresh on every run. Linked libraries are still cached.
+      // the app's modules stay out of that cache. The plugin's own cache, whose key covers all of
+      // that, serves them instead (`OutputCache`). Linked libraries stay in Vitest's.
       context.defineCacheKeyGenerator(({id}) => (isAppModule(id) ? false : undefined));
     },
 
@@ -728,6 +746,9 @@ function compilerPlugin(
     async closeBundle() {
       await devCheck?.close();
       if (config.command === 'build') {
+        if (debug && cache) {
+          process.stderr.write(`vite-plugin-ngp cache: ${cache.hits} hits, ${cache.misses} misses (${cache.dir})\n`);
+        }
         return closeCompilers();
       }
     },
@@ -791,7 +812,8 @@ function compilerPlugin(
         if (debug) {
           const ms = (performance.now() - start).toFixed(1);
           // To stderr, like Vite's own DEBUG output: Vitest silences Vite's logger.
-          process.stderr.write(`vite-plugin-ngp ${result ? 'compiled' : 'unchanged'} ${path.relative(config.root, file)} (${ms} ms)\n`);
+          const what = result?.cached ? 'reused' : result ? 'compiled' : 'unchanged';
+          process.stderr.write(`vite-plugin-ngp ${what} ${path.relative(config.root, file)} (${ms} ms)\n`);
         }
         // Freshly compiled code already contains any pending template update.
         const prefix = decodeURIComponent(ngp.componentId(file, ''));
@@ -971,7 +993,7 @@ function linkerRolldownPlugin(): RolldownPlugin {
 }
 
 /** Runs Angular's linker on library code, both where Vite pre-bundles it and where it doesn't. */
-function linkerPlugin(): Plugin {
+function linkerPlugin(api: CompilerApi): Plugin {
   return {
     name: 'vite-plugin-ngp:linker',
     config() {
@@ -981,7 +1003,14 @@ function linkerPlugin(): Plugin {
       return {optimizeDeps: {rolldownOptions: {plugins: [linkerRolldownPlugin()]}}};
     },
     // Production builds, and dependencies Vite serves without pre-bundling.
-    transform: {filter: LINKER_FILTER, handler: (code, id) => link(code, id) as never},
+    transform: {
+      filter: LINKER_FILTER,
+      handler(code, id) {
+        const cache = api.cache();
+        // Linking is a function of the file and the installed Angular, which the cache's scope covers.
+        return (cache ? cache.reuse(['linker', cleanId(id), code], () => link(code, id)) : link(code, id)) as never;
+      },
+    },
   };
 }
 
@@ -1060,7 +1089,7 @@ function serverOptimizeDeps(noExternal: RegExp[]): DepOptimizationOptions {
  * pure, so Rolldown can drop what the app doesn't use. Runs after the linker for libraries, and
  * after Vite has stripped TypeScript for the app's own modules.
  */
-function optimizerPlugin(): Plugin {
+function optimizerPlugin(api: CompilerApi): Plugin {
   return {
     name: 'vite-plugin-ngp:optimizer',
     apply: 'build',
@@ -1071,7 +1100,12 @@ function optimizerPlugin(): Plugin {
     transform: {
       filter: {id: /\.[cm]?[jt]s$/, code: OPTIMIZER_CANDIDATE},
       handler(code, id) {
-        return optimize(code, id, {sideEffectFree: isSideEffectFree(cleanId(id))}) as never;
+        const file = cleanId(id);
+        const sideEffectFree = isSideEffectFree(file);
+        const run = () => optimize(code, id, {sideEffectFree});
+        const cache = api.cache();
+        // The pass reads the code, and the file's path for whether it's Angular's own package.
+        return (cache ? cache.reuse(['optimizer', file, sideEffectFree, code], run) : run()) as never;
       },
     },
   };
