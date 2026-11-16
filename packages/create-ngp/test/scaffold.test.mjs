@@ -128,7 +128,7 @@ describe('next steps', () => {
     assert.equal(packageManager('yarn/4.9.0 npm/? node/v26.12.1'), 'yarn');
     assert.equal(packageManager('bun/1.3.0'), 'bun');
     assert.equal(packageManager('npm/11.6.0 node/v26.12.1'), 'npm');
-    assert.equal(packageManager(undefined), 'npm');
+    assert.equal(packageManager(''), 'npm');
   });
 
   it('prints cd, install and dev', () => {
