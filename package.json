@@ -9,7 +9,7 @@
     "build": "pnpm -r --filter ./packages/* build",
     "dev": "pnpm build && pnpm --filter playground dev",
     "playground:build": "pnpm build && pnpm --filter playground build",
-    "test": "pnpm build && export NGP_TOOLCHAIN=\"${NGP_TOOLCHAIN:-$PWD/toolchain/out}\" && pnpm --filter @push-based/vite-plugin-ngp test && pnpm --filter playground test && pnpm docs:check",
+    "test": "pnpm build && export NGP_TOOLCHAIN=\"${NGP_TOOLCHAIN:-$PWD/toolchain/out}\" && pnpm --filter @push-based/vite-plugin-ngp test && pnpm --filter @push-based/create-ngp test && pnpm --filter playground test && pnpm docs:check",
     "site:dev": "pnpm build && pnpm --filter site dev",
     "site:build": "pnpm build && pnpm --filter site build",
     "docs:check": "node site/scripts/check-docs.ts"

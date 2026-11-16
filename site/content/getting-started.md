@@ -7,6 +7,9 @@ description: Install @push-based/vite-plugin-ngp from npm and serve your Angular
 
 This page takes you from an Angular app to the same app served by Vite through vite-plugin-ngp. Plan on about five minutes. You'll need to pin exact Angular versions, because the ngp build inside the package only works with the Angular release it was built from.
 
+> [!TIP]
+> Starting a new app? `npm create @push-based/ngp@latest`, or `vp create @push-based/ngp` with [Vite+](vite-plus), writes the app this page describes, with a spec and an optional server-rendering setup.
+
 ## What you need
 
 | | |

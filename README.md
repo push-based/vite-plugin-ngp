@@ -36,7 +36,13 @@ A first version on top of a prototype compiler. Everything below was checked in 
 
 ## Try it
 
-You need macOS or Linux, Node 26, and every `@angular/*` package pinned to exactly `22.3.0-rc.0`.
+You need macOS or Linux, Node 26, and every `@angular/*` package pinned to exactly `22.3.0-rc.0`. To start a new app, let the scaffolder write it:
+
+```bash
+npm create @push-based/ngp@latest
+```
+
+With [Vite+](https://viteplus.dev), that's `vp create @push-based/ngp`; [Using Vite+](https://push-based.github.io/vite-plugin-ngp/vite-plus/) has the options. To add the plugin to an app you already have:
 
 ```bash
 npm install -D @push-based/vite-plugin-ngp vite@8.3.4
@@ -70,6 +76,7 @@ To run the playground in this repo, or to work on the plugin, [docs/building.md]
 | Path | What it is |
 |---|---|
 | [packages/vite-plugin-ngp](packages/vite-plugin-ngp) | The plugin and its tests |
+| [packages/create-ngp](packages/create-ngp) | `@push-based/create-ngp`, the scaffolder behind `npm create @push-based/ngp`, and its two templates |
 | [playground](playground) | A demo app with one page per Angular feature area. Its [README](playground/README.md) says what each page exercises |
 | [site](site) | The docs site, an Angular app built with the plugin. Its pages are Markdown in [site/content](site/content) |
 | [bench](bench) | The benchmark behind the Performance and Benchmarks pages |

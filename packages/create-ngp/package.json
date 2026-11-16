@@ -1,0 +1,54 @@
+{
+  "name": "@push-based/create-ngp",
+  "nx": {
+    "name": "create-ngp"
+  },
+  "version": "0.4.0",
+  "description": "Scaffold an Angular app built by vite-plugin-ngp: npm create @push-based/ngp, or vp create @push-based/ngp",
+  "license": "MIT",
+  "author": "PushBased",
+  "homepage": "https://push-based.github.io/vite-plugin-ngp/vite-plus/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/push-based/vite-plugin-ngp.git",
+    "directory": "packages/create-ngp"
+  },
+  "bugs": {
+    "url": "https://github.com/push-based/vite-plugin-ngp/issues"
+  },
+  "keywords": [
+    "angular",
+    "vite",
+    "vite-plus",
+    "ngp",
+    "create",
+    "scaffold",
+    "template"
+  ],
+  "type": "module",
+  "bin": {
+    "create-ngp": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "src",
+    "templates"
+  ],
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "prepack": "node scripts/check-pins.mjs"
+  },
+  "dependencies": {
+    "@clack/prompts": "1.8.1",
+    "mri": "1.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5"
+  },
+  "engines": {
+    "node": ">=26.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

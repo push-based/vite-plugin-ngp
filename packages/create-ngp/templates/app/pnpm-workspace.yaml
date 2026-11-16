@@ -1,0 +1,8 @@
+# Read by pnpm only; npm, yarn and bun ignore this file.
+# esbuild comes with vite-plugin-ngp and works without its install script. pnpm 11 and later stop
+# the install over a build script nobody approved or denied, and pnpm 10 warns, so this denies it:
+# allowBuilds for pnpm 11 and later, ignoredBuiltDependencies for pnpm 10.
+allowBuilds:
+  esbuild: false
+ignoredBuiltDependencies:
+  - esbuild

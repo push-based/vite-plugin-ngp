@@ -9,6 +9,10 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 
 ## 25 November 2026
 
+### New apps
+
+- `npm create @push-based/ngp`, or `vp create @push-based/ngp` with Vite+, scaffolds an Angular app on the plugin: the app [Getting started](getting-started) describes, with routing, a Vitest spec on the server platform, and an `app-ssr` template that renders on the server and hydrates. The scaffolder is a new package, `@push-based/create-ngp`, released with the plugin at the same version, and it pins the plugin and Angular to the versions released together. [Using Vite+](vite-plus#create-a-new-app)
+
 ### Fixes
 
 - An extended diagnostic in an external template, such as NG8109 for an uninvoked signal in `counter.html`, no longer breaks the component under the dev server or Vitest. Vite read the template offset as one into the `.ts` module, so the frame showed the wrong line, and an offset past the module's end threw and failed the module over a warning. The message now starts with the template's `path:line:column`, and a warning stays a warning. [Type-checking](type-checking#angulars-extended-diagnostics)

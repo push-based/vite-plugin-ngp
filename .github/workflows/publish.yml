@@ -1,5 +1,6 @@
-# Builds vite-plugin-ngp with ngp inside it and publishes it to npm. Starts on the v* tag release.yml
-# pushes, or by hand from the Actions tab; a version already on npm is skipped.
+# Builds vite-plugin-ngp with ngp inside it and publishes it to npm, with @push-based/create-ngp at the
+# same version. Starts on the v* tag release.yml pushes, or by hand from the Actions tab; a version
+# already on npm is skipped. Once both are out, create-ngp-e2e.yml scaffolds apps from them.
 #
 # ngp ships in the package (toolchain/bundle.mjs): its TypeScript backend, the wasm engine, and a
 # native engine for each of four platforms, each built on its own runner below. The package's
@@ -10,7 +11,7 @@
 # Renaming this file or the environment breaks publishing until the npm settings match again.
 #
 # With "Dry run" ticked it builds and packs everything, uploads the tarball as an artifact, and
-# publishes nothing. The first release is published by hand from that tarball (docs/releasing.md).
+# publishes nothing. A package's first version is published by hand (docs/releasing.md).
 name: Publish
 
 on:
@@ -123,5 +124,23 @@ jobs:
           name: vite-plugin-ngp-package
           path: ${{ runner.temp }}/package/*.tgz
           if-no-files-found: error
+      # Plain JavaScript, no engines. Its prepack checks the templates pin what the repo tests with.
+      - name: Pack create-ngp
+        run: pnpm --filter @push-based/create-ngp pack --pack-destination "$RUNNER_TEMP/create-ngp"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: create-ngp-package
+          path: ${{ runner.temp }}/create-ngp/*.tgz
+          if-no-files-found: error
       - name: Publish packages to npm
         run: pnpm nx release publish ${{ inputs.dry-run && '--dry-run' || '' }}
+
+  # Scaffolds an app from each template through `vp create`, from npm, at the version just
+  # published, so a template that pins a plugin version npm doesn't have fails here.
+  e2e:
+    name: Scaffold from npm
+    needs: publish
+    if: ${{ !inputs.dry-run }}
+    uses: ./.github/workflows/create-ngp-e2e.yml
+    with:
+      version: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
