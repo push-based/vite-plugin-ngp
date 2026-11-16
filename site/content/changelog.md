@@ -15,7 +15,12 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 
 ### Fixes
 
+- Under pnpm 11 and later, which Vite+ installs with, a template type error made `vite build` and `vp build` fail with "Cannot read properties of undefined (reading 'Latest')" instead of reporting the error, and a `.ts` edit in the dev server hit the same error. pnpm linked the TypeScript 7 the plugin carries for its type-check under the name `typescript` inside the plugin. The plugin now parses with the TypeScript `@angular/compiler-cli` uses, your TypeScript 6. [Using Vite+](vite-plus#limits)
 - An extended diagnostic in an external template, such as NG8109 for an uninvoked signal in `counter.html`, no longer breaks the component under the dev server or Vitest. Vite read the template offset as one into the `.ts` module, so the frame showed the wrong line, and an offset past the module's end threw and failed the module over a warning. The message now starts with the template's `path:line:column`, and a warning stays a warning. [Type-checking](type-checking#angulars-extended-diagnostics)
+
+### Docs
+
+- [Using Vite+](vite-plus) now covers moving an existing app with `vp migrate`, including the esbuild install script pnpm 11 and later stop on, what `vp check`, `vp test` and `vpx ngp-extract-i18n` do with an Angular app, and server rendering under `vp dev` and `vp build`. CI runs both templates under Vite+ on every change.
 
 ## 17 November 2026
 
