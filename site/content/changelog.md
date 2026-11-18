@@ -7,6 +7,12 @@ description: What changed in vite-plugin-ngp, newest first, for anyone following
 
 What changed in vite-plugin-ngp, newest first, written for people using it. Every entry links to the page that documents it. Versions on npm, with the commits in each, are in the repo's [CHANGELOG.md](https://github.com/push-based/vite-plugin-ngp/blob/main/CHANGELOG.md) and its [GitHub releases](https://github.com/push-based/vite-plugin-ngp/releases).
 
+## 18 November 2026
+
+### New apps
+
+- `npm create @push-based/ngp`, or `vp create @push-based/ngp` with Vite+, scaffolds an Angular app on the plugin: the app [Getting started](getting-started) describes, with routing, a Vitest spec on the server platform, and an `app-ssr` template that renders on the server and hydrates. The scaffolder is a new package, `@push-based/create-ngp`, released with the plugin at the same version, and it pins the plugin and Angular to the versions released together. [Using Vite+](vite-plus#create-a-new-app)
+
 ## 17 November 2026
 
 ### Angular

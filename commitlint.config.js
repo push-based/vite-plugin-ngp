@@ -9,7 +9,8 @@ export default {
   extends: ['@commitlint/config-conventional'],
   plugins: ['commitlint-plugin-tense'],
   rules: {
-    // The workspace's projects (vite-plugin-ngp, playground, site), plus the parts that aren't one.
+    // The workspace's projects (vite-plugin-ngp, create-ngp, playground, site), plus the parts that
+    // aren't one. A package's project name is the `nx.name` in its package.json.
     'scope-enum': async (ctx) => {
       const projects = nxScopes.utils.getProjects(ctx);
       const scopes = [...projects, 'bench', 'toolchain', 'workflows'].sort();

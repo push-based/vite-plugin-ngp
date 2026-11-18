@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-424 -424 848 848" width="256" height="256" role="img" aria-labelledby="t">
+  <title id="t">vite-plugin-ngp</title>
+  <defs>
+    <linearGradient id="gear" gradientUnits="userSpaceOnUse" x1="-419" y1="0" x2="419" y2="0">
+      <stop offset="0" stop-color="#00C2FF"/>
+      <stop offset="0.2" stop-color="#00E5FF"/>
+      <stop offset="0.36" stop-color="#1E8BFF"/>
+      <stop offset="0.52" stop-color="#8A4DFC"/>
+      <stop offset="0.72" stop-color="#F00AF0"/>
+      <stop offset="1" stop-color="#FF0AD2"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0.3" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#00F5FF"/>
+      <stop offset="1" stop-color="#0A5CF2"/>
+    </linearGradient>
+    <linearGradient id="right" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#FF4CF0"/>
+      <stop offset="0.5" stop-color="#E000FA"/>
+      <stop offset="1" stop-color="#8A08F9"/>
+    </linearGradient>
+    <linearGradient id="counter" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF2EEA"/>
+      <stop offset="1" stop-color="#F005FA"/>
+    </linearGradient>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#10D8FC"/>
+      <stop offset="0.5" stop-color="#8A1FFF"/>
+      <stop offset="1" stop-color="#FF07D6"/>
+    </linearGradient>
+    <mask id="gap" maskUnits="userSpaceOnUse" x="-424" y="-424" width="848" height="848">
+      <path fill="#FFFFFF" d="M-424,-424H424V424H-424Z"/>
+      <path fill="#000000" stroke="#000000" stroke-width="36" d="M-259.73,-190A292,292 0 0,0 -259.73,190L-204.73,190A292,292 0 0,1 -204.73,-190ZM259.73,-190A292,292 0 0,1 259.73,190L204.73,190A292,292 0 0,0 204.73,-190Z"/>
+    </mask>
+  </defs>
+  <path fill="url(#gear)" fill-rule="evenodd" stroke="url(#gear)" stroke-width="10" stroke-linejoin="round" mask="url(#gap)" d="M-61.96,-358.69L-40.4,-412.02L40.4,-412.02L61.96,-358.69L99.81,-350.05L142.37,-388.75L215.17,-353.69L211.45,-296.29L241.8,-272.08L296.94,-288.48L347.32,-225.31L319.06,-175.2L335.91,-140.22L392.7,-131.07L410.68,-52.3L363.48,-19.41L363.48,19.41L410.68,52.3L392.7,131.07L335.91,140.22L319.06,175.2L347.32,225.31L296.94,288.48L241.8,272.08L211.45,296.29L215.17,353.69L142.37,388.75L99.81,350.05L61.96,358.69L40.4,412.02L-40.4,412.02L-61.96,358.69L-99.81,350.05L-142.37,388.75L-215.17,353.69L-211.45,296.29L-241.8,272.08L-296.94,288.48L-347.32,225.31L-319.06,175.2L-335.91,140.22L-392.7,131.07L-410.68,52.3L-363.48,19.41L-363.48,-19.41L-410.68,-52.3L-392.7,-131.07L-335.91,-140.22L-319.06,-175.2L-347.32,-225.31L-296.94,-288.48L-241.8,-272.08L-211.45,-296.29L-215.17,-353.69L-142.37,-388.75L-99.81,-350.05ZM45,-301.66A305,305 0 0,1 45,301.66L20,272L-20,272L-45,301.66A305,305 0 0,1 -45,-301.66L-20,-272L20,-272ZM-30,-350a30,30 0 1,0 60,0a30,30 0 1,0 -60,0ZM-30,350a30,30 0 1,0 60,0a30,30 0 1,0 -60,0Z"/>
+  <path fill="url(#gear)" d="M-259.73,-190A292,292 0 0,0 -259.73,190L-204.73,190A292,292 0 0,1 -204.73,-190ZM259.73,-190A292,292 0 0,1 259.73,190L204.73,190A292,292 0 0,0 204.73,-190Z"/>
+  <path fill="url(#left)" d="M-19,-244L-200,-136L-201,128Z"/>
+  <path fill="url(#right)" d="M19,-244L200,-136L201,128Z"/>
+  <path fill="url(#counter)" d="M0,-118L80,38L-80,38Z"/>
+  <path fill="url(#base)" d="M-115,93L115,93L154,164L0,254L-154,164Z"/>
+</svg>

@@ -1,0 +1,15 @@
+<header>
+  <h1>Angular on Vite</h1>
+  <p>
+    Compiled one module at a time by vite-plugin-ngp. Edit <code>src/app/app.html</code> and save.
+  </p>
+</header>
+
+<main>
+  <button type="button" (click)="count()">Clicks: {{ clicks() }}</button>
+
+  <nav>
+    <a routerLink="/">Home</a>
+  </nav>
+  <router-outlet />
+</main>

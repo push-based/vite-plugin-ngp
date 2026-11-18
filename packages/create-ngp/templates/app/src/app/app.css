@@ -1,0 +1,15 @@
+:host {
+  display: block;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+button {
+  font: inherit;
+  padding: 0.5rem 1rem;
+}
+
+nav {
+  margin-top: 1.5rem;
+}

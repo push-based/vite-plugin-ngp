@@ -5,7 +5,7 @@ description: Run Angular TestBed specs under Vitest, compiled AOT by vite-plugin
 
 # Testing with Vitest
 
-vite-plugin-ngp runs your Angular specs under Vitest with TestBed. It compiles them ahead of time with ngp, the same way it compiles your app in the dev server. A run compiles only the specs you asked for and what they import: run one spec, and ngp compiles that spec's components, not the whole app. Specs run one of three ways: in Node on Domino, the DOM Angular renders with on the server, which is the default here; on jsdom; or in a real Chromium through Vitest's browser mode. Setup is the plugin in `vitest.config.ts` plus one setup file per way, and the playground runs its specs all three ways.
+vite-plugin-ngp runs your Angular specs under Vitest with TestBed. It compiles them ahead of time with ngp, the same way it compiles your app in the dev server. A run compiles only the specs you asked for and what they import: run one spec, and ngp compiles that spec's components, not the whole app. Specs run one of three ways: in Node on Domino, the DOM Angular renders with on the server, which is the default here; on jsdom; or in a real Chromium through Vitest's browser mode. Setup is the plugin in `vitest.config.ts` plus one setup file per way, and the playground runs its specs all three ways. An app from [`npm create @push-based/ngp`](vite-plus#create-a-new-app) comes with the server-platform setup below.
 
 This page is for someone who already builds an app with the plugin and wants to test it. It covers the three setups, which to pick, what the plugin changes when Vitest runs it, and what hasn't been tried yet.
 

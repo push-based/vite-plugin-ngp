@@ -22,6 +22,7 @@ When you add or change anything a user of the plugin would see, update the match
 | A number measured with `bench/` on a real app, or how the real apps are set up | `site/content/benchmarks.md`, its figures (same command), and `bench/README.md` |
 | What works, what doesn't, a new limit or a fixed one | `site/content/status.md` |
 | Setup steps, required versions | `site/content/getting-started.md` |
+| The scaffolder (`packages/create-ngp`), its templates or options, or how the plugin runs under Vite+ | `site/content/vite-plus.md` |
 | How the repo builds ngp, `toolchain/`, what goes in the package | `docs/building.md` |
 | A number on the home page, or the home page's claims | `site/src/app/pages/home.ts` and `home.html` |
 | Anything above that a user would notice | also a line in `site/content/changelog.md`, under today's date, linking to the page that documents it |
@@ -60,7 +61,7 @@ fix(vite-plugin-ngp): keep component state when a stylesheet is edited
 ```
 
 - Type: `feat` (a user can do something new), `fix`, `perf`, `docs`, `refactor`, `test`, `build`, `ci` or `chore`. `feat` and `fix` cut a version, so a docs-only or bench change is never `feat`. Mark a breaking change with `!` after the type.
-- Scope, optional: `vite-plugin-ngp`, `playground`, `site`, `bench`, `toolchain` or `workflows`.
+- Scope, optional: `vite-plugin-ngp`, `create-ngp`, `playground`, `site`, `bench`, `toolchain` or `workflows`.
 - Subject in the imperative present tense, lowercase after the colon, no period, and the header at most 100 characters. Use one verb: the tense check rejects any other verb in the subject, so "note that v1 has a tag" fails on "has". Body lines at most 100 characters too.
 
 Don't bypass the hook with `--no-verify`. Releasing is in [docs/releasing.md](docs/releasing.md); never run `nx release` yourself unless asked.

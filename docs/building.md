@@ -54,7 +54,7 @@ toolchain/out/engines/wasm/        ng_analyze.js and ng_analyze_bg.wasm
 pnpm test
 ```
 
-This builds the plugin and compiles every playground module through ngp. Then:
+This builds the plugin and compiles every playground module through ngp. It also scaffolds both [create-ngp](../packages/create-ngp) templates into a temporary folder, installs them from npm with the plugin packed from the repo, and builds and tests them, so it needs the network. With `vp` on your `PATH`, it does the same again after `vp migrate`. Then:
 
 ```bash
 pnpm dev
@@ -73,6 +73,8 @@ This starts Vite on the playground at http://localhost:5173. For a production bu
 To start over, delete `toolchain/.cache` and `toolchain/out`.
 
 ## The build inside the package
+
+This is about the plugin. The repo's second package, `@push-based/create-ngp` in `packages/create-ngp`, is plain JavaScript with no build and no ngp: what's in the folder is what ships, minus the tests and `scripts/`.
 
 A release carries ngp in `packages/vite-plugin-ngp/ngp`: the backend, the wasm engine, and native engines in `engines/native/<platform>-<arch>/` for `darwin-arm64`, `darwin-x64`, `linux-x64` and `linux-arm64`. The [Publish workflow](../.github/workflows/publish.yml) builds each native engine on its own runner and assembles them with [toolchain/bundle.mjs](../toolchain/bundle.mjs). The Linux ones are built on Ubuntu 22.04 and link against its glibc 2.35, so they don't load on older distros or on musl.
 

@@ -1,0 +1,96 @@
+# Scaffolds an app from each create-ngp template the way a user does, `vp create @push-based/ngp`
+# from npm, then builds it, runs its spec and `vp check`, and renders a page from the server build.
+#
+# publish.yml calls it with the version it just published. It also runs weekly against `latest`,
+# because a Vite+ release can change the rewrite `vp create` makes after the template exits, and by
+# hand from the Actions tab. It installs Vite+'s latest release each time, for the same reason.
+name: create-ngp e2e
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Version of @push-based/create-ngp to scaffold from, with or without a leading v
+        type: string
+        default: ''
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version of @push-based/create-ngp (empty for latest)
+        type: string
+        default: ''
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  scaffold:
+    name: vp create (${{ matrix.template }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        template: [app, app-ssr]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: voidzero-dev/setup-vp@v1.22.0
+        with:
+          run-install: false
+          node-manager: false
+
+      - name: Pick the version
+        id: version
+        run: |
+          version="${INPUT_VERSION#v}"
+          echo "spec=@push-based/ngp${version:+@$version}" >> "$GITHUB_OUTPUT"
+          echo "version=${version:-latest}" >> "$GITHUB_OUTPUT"
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+
+      # Right after a publish, the registry can take a minute to serve the new version.
+      - name: Wait for npm
+        run: |
+          for attempt in $(seq 1 30); do
+            npm view "@push-based/create-ngp@$VERSION" version && exit 0
+            sleep 20
+          done
+          echo "@push-based/create-ngp@$VERSION never showed up on npm" >&2
+          exit 1
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+
+      - name: vp create
+        working-directory: ${{ runner.temp }}
+        run: vp create "$SPEC" --no-interactive --no-agent --no-editor -- e2e --no-interactive --template "$TEMPLATE"
+        env:
+          SPEC: ${{ steps.version.outputs.spec }}
+          TEMPLATE: ${{ matrix.template }}
+
+      - name: vp check
+        working-directory: ${{ runner.temp }}/e2e
+        run: vp check
+
+      - name: vp build
+        working-directory: ${{ runner.temp }}/e2e
+        run: vp build
+
+      - name: vp test
+        working-directory: ${{ runner.temp }}/e2e
+        run: vp test run
+
+      - name: Render a page from the server build
+        if: matrix.template == 'app-ssr'
+        working-directory: ${{ runner.temp }}/e2e
+        run: |
+          node server.mjs &
+          for attempt in $(seq 1 30); do
+            curl -sf -H 'Accept: text/html' http://localhost:4000/ -o page.html && break
+            sleep 1
+          done
+          grep -q 'Clicks: 0' page.html
