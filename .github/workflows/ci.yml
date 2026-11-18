@@ -1,5 +1,5 @@
-# Builds ngp from source, then the plugin, its tests, the playground's Vitest specs and the
-# playground itself, on a clean machine.
+# Builds ngp from source, then the plugin, its tests, create-ngp's apps with and without Vite+, the
+# playground's Vitest specs and the playground itself, on a clean machine.
 # This is the check that the build instructions in docs/building.md work.
 name: ci
 
@@ -43,7 +43,16 @@ jobs:
       # The playground's browser-mode project runs its specs in headless Chromium.
       - run: pnpm --filter playground exec playwright install --with-deps chromium
 
-      # The plugin's own tests, then the playground's specs under Vitest, three ways.
+      # Vite+, for create-ngp's tests: they run each scaffolded app again after `vp migrate`, which
+      # installs with Vite+'s own pnpm (12 in 1.6.0), the setup a `vp create` user gets. Pinned like
+      # any dependency; create-ngp-e2e.yml tries the latest Vite+ every week.
+      - uses: voidzero-dev/setup-vp@v1.22.0
+        with:
+          version: 1.6.0
+          run-install: false
+          node-manager: false
+
+      # The plugin's own tests, create-ngp's, then the playground's specs under Vitest, three ways.
       - run: pnpm test
 
       - run: pnpm playground:build

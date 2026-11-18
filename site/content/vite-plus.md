@@ -1,6 +1,6 @@
 ---
 title: Using Vite+
-description: Start an Angular app on vite-plugin-ngp with vp create @push-based/ngp or npm create @push-based/ngp, and what Vite+ changes in it.
+description: Start an Angular app on vite-plugin-ngp with vp create @push-based/ngp, move an existing one with vp migrate, and what vp check, vp test and the rest do with Angular.
 ---
 
 # Using Vite+
@@ -96,7 +96,51 @@ export default defineConfig({
 vp fmt
 ```
 
+## Move an existing app to Vite+
+
+An app set up as [Getting started](getting-started) describes moves with one command, in its root:
+
+```bash
+vp migrate
+```
+
+It makes the rewrite listed above: `vite-plus` added, `vite` aliased, scripts and imports changed, `lazyPlugins`, and the `fmt`, `lint` and `staged` blocks. Your `vitest.config.ts` stays, with its import changed to `vite-plus`. Then:
+
+1. **Check that `vite` is still in `package.json`**, as `npm:@voidzero-dev/vite-plus-core@<version>` or through `catalog:`. Getting started has you install `vite`, so it is, unless you removed it.
+2. **With pnpm 11 or later, deny esbuild's install script** if the install stops at "Ignored build scripts: esbuild". Vite+ 1.6.0 installs with pnpm 12. In `pnpm-workspace.yaml`:
+
+   ```yaml title="pnpm-workspace.yaml"
+   allowBuilds:
+     esbuild: false
+   ```
+
+   Then run `vp install` again. esbuild comes with the plugin, which doesn't need the script.
+3. **Format once:** `vp check --fix`. `vp migrate` doesn't format, and Oxfmt's defaults differ from Angular's style, so `vp check` fails on formatting until you do. Set `fmt.singleQuote` first if you want to keep single quotes.
+4. **Run `vp build` and `vp test`.**
+
+With npm, `vp migrate` writes the alias as an `overrides` entry in `package.json`, and the install accepts it with no peer warning. With pnpm it goes in `pnpm-workspace.yaml`, with a `peerDependencyRules` entry that lets the alias stand in for `vite`.
+
+### From ng build
+
+Move the app off `ng build` first, with [Migrating from ng build](migrating-from-ng-build), then run `vp migrate` on the Vite project that leaves you. `vp migrate` converts Vite and Vitest projects, so it can't do the first step for you. Nobody has yet run it on an app that still has `angular.json`; delete that, and the `ng` scripts, once nothing uses them. If you use Husky, it stays: Vite+'s [migration guide](https://viteplus.dev/guide/migrate) says `vp migrate` leaves Husky's hooks, scripts and dependencies unchanged and warns, and you move them to its `.vite-hooks` by hand.
+
+## The toolchain with Angular
+
+| Command | What it does with an Angular app |
+|---|---|
+| `vp dev`, `vp build`, `vp preview` | Run Vite+'s Vite with the plugin, exactly as `vite` does. The plugin's type-check runs in both, and its errors fail `vp build` |
+| `vp test` | Runs Vitest 5.1, bundled with Vite+ 1.6.0. Specs and the setup file import from `vite-plus/test`; the [setup](testing#setup-node-on-the-server-platform) is otherwise unchanged |
+| `vp check` | Formats with Oxfmt, lints with Oxlint, and type-checks `.ts` files with TypeScript 7. It doesn't check templates: a misspelled property in `app.html` passes `vp check` and fails `vp build`, from the plugin's check |
+| `vp lint`, `vp fmt` | The lint and format halves of `vp check`, on their own. Oxlint has no Angular rules; decorators and signals lint clean |
+| `vpx ngp-extract-i18n` | Extracts messages, as `ngp-extract-i18n` does. The `i18n` option's per-locale build works under `vp build` |
+
+## Server rendering under Vite+
+
+Nothing changes. With `ngp({ ssr: true })`, `vp dev` renders every page through `src/main.server.ts`, and `vp build` writes `dist/client` and `dist/server` as [Server rendering](server-rendering) describes. The `app-ssr` template's `server.mjs` is plain Node: run it with `node server.mjs`.
+
 ## Limits
 
 - **The command is `vp create @push-based/ngp`.** A bare `vp create ngp` resolves to another package name, and the template isn't in `vp create --list`. Both need a change in Vite+ itself.
+- **pnpm 11 and later report an unmet `typescript` peer.** The plugin depends on TypeScript 7 for its type-check, as an alias, and pnpm counts that as the plugin's TypeScript. The plugin parses with the TypeScript `@angular/compiler-cli` uses, your TypeScript 6, so the warning is harmless. In 0.4.0 and earlier it wasn't: under pnpm 11 and later the plugin loaded TypeScript 7 there, so a template error made `vp build` fail with "Cannot read properties of undefined (reading 'Latest')" instead of the error, and so did a `.ts` edit in `vp dev`.
+- **Not tried under Vite+:** Nx workspaces, Vitest's browser mode and jsdom, and `vp pack`, which builds libraries; the plugin [compiles apps only](status).
 - **Windows is untested,** with Vite+ as without it.

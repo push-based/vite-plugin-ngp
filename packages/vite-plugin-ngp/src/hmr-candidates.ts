@@ -1,4 +1,5 @@
-import ts from 'typescript';
+import type * as TS from 'typescript';
+import {ts} from './typescript.js';
 
 /**
  * Decorator fields whose edits a component update module can apply in place. The CLI also accepts
@@ -32,7 +33,7 @@ export function hmrCandidates(
   if (staleFile.statements.length !== updatedFile.statements.length) {
     return null;
   }
-  const same = (a: ts.TextRange | undefined, b: ts.TextRange | undefined) => equalText(staleFile, a, updatedFile, b);
+  const same = (a: TS.TextRange | undefined, b: TS.TextRange | undefined) => equalText(staleFile, a, updatedFile, b);
   const candidates: string[] = [];
   for (let i = 0; i < updatedFile.statements.length; i++) {
     const before = staleFile.statements[i]!;
@@ -48,7 +49,7 @@ export function hmrCandidates(
     if (before.name?.text !== name || !same(before.heritageClauses, after.heritageClauses) || !same(before.members, after.members)) {
       return null;
     }
-    const modifiers = (node: ts.ClassDeclaration) => (ts.getModifiers(node) ?? []).map((m) => m.kind).join();
+    const modifiers = (node: TS.ClassDeclaration) => (ts.getModifiers(node) ?? []).map((m) => m.kind).join();
     if (modifiers(before) !== modifiers(after)) {
       return null;
     }
@@ -69,7 +70,7 @@ export function hmrCandidates(
   return candidates;
 }
 
-function componentCall(node: ts.ClassDeclaration) {
+function componentCall(node: TS.ClassDeclaration) {
   const decorators = ts.getDecorators(node) ?? [];
   // The CLI rejects every component with more than one decorator too.
   const call = decorators.length === 1 ? decorators[0]!.expression : undefined;
@@ -80,7 +81,7 @@ function componentCall(node: ts.ClassDeclaration) {
   if (!ts.isObjectLiteralExpression(literal)) {
     return null;
   }
-  const fields: {name: string; value: ts.Expression}[] = [];
+  const fields: {name: string; value: TS.Expression}[] = [];
   for (const property of literal.properties) {
     // Shorthand, spread, methods and computed names hide what the value is.
     if (!ts.isPropertyAssignment(property) || ts.isComputedPropertyName(property.name)) {
@@ -96,9 +97,9 @@ function componentCall(node: ts.ClassDeclaration) {
  * nothing was, and 'unsupported' when any other field changed, moved, or was added or removed.
  */
 function compareFields(
-  before: {name: string; value: ts.Expression}[],
-  after: {name: string; value: ts.Expression}[],
-  same: (a: ts.TextRange | undefined, b: ts.TextRange | undefined) => boolean,
+  before: {name: string; value: TS.Expression}[],
+  after: {name: string; value: TS.Expression}[],
+  same: (a: TS.TextRange | undefined, b: TS.TextRange | undefined) => boolean,
 ): 'changed' | 'unchanged' | 'unsupported' {
   const hmrBefore = new Map(before.filter((f) => HMR_FIELDS.has(f.name)).map((f) => [f.name, f.value]));
   const otherBefore = before.filter((f) => !HMR_FIELDS.has(f.name));
@@ -121,7 +122,7 @@ function compareFields(
 }
 
 /** Compares two ranges' source text, leading trivia included, the way the CLI does. */
-function equalText(a: ts.SourceFile, aRange: ts.TextRange | undefined, b: ts.SourceFile, bRange: ts.TextRange | undefined): boolean {
+function equalText(a: TS.SourceFile, aRange: TS.TextRange | undefined, b: TS.SourceFile, bRange: TS.TextRange | undefined): boolean {
   if (!aRange || !bRange) {
     return aRange === bRange;
   }

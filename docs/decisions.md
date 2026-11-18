@@ -821,3 +821,27 @@ A disk cache of the linker's output, keyed by file content and Angular version, 
 **Cost.** Two more dev dependencies in `app`, `@angular/platform-server` and `@angular/platform-browser-dynamic`, the second deprecated on npm though `ServerTestingModule` still imports it. Domino's smaller DOM: a spec written for jsdom can trip over [its gaps](../site/content/testing.md).
 
 **Revisit when** Angular's platform-server moves off Domino, or Vitest's browser mode gets cheap enough to be the default.
+
+## 69. Run under Vite+ as a plain Vite plugin: keep the `vite` imports and the `^8.3.0` peer
+
+*17 November 2026*
+
+**Decision.** The plugin keeps importing from `vite` and keeps `peerDependencies.vite: ^8.3.0`. Under Vite+, the project declares `vite`, which `vp migrate` and `vp create` then alias to `@voidzero-dev/vite-plus-core`, Vite+'s build of Vite. The docs say so, and the templates declare it ([decision 67](#67-scaffold-new-apps-with-push-basedcreate-ngp-a-plain-vite-project-that-vite-converts)). CI installs Vite+ 1.6.0 and runs both templates through `vp migrate`, `vp check`, `vp build`, `vp test` and `vp dev`; a weekly workflow does it with the latest Vite+ through `vp create` from npm.
+
+**Why.** The alias is enough: with it, the plugin runs unchanged under `vp dev`, `vp build`, `vp test` and `vp check`, server rendering and per-locale builds included, checked on 16 and 17 November 2026. The alternatives cost more for less. Widening the peer to admit `@voidzero-dev/vite-plus-core` names a package by its alias, which npm and pnpm compare against the alias's own version, 1.6.0. Resolving `vite` at runtime from `vite-plus` doesn't work: `vite-plus` re-exports `defineConfig` and a few helpers, not `createFilter`, `parseSync` or `createBuilder`. In practice the peer costs nothing either: pnpm's migration adds `peerDependencyRules` for `vite`, and npm's `overrides` entry installs without a peer warning. The CI job runs the templates rather than the playground, which keeps plain Vite so the repo's own tooling stays as it is; running `vp` over an unmigrated project wouldn't test the alias, and `vp migrate` on the playground would change the repo.
+
+**Cost.** A Vite+ project that drops `vite` from `package.json` can't load the plugin, and only the docs say why. The CI job adds two installs of Angular to every run. The playground's three Vitest setups aren't run under Vite+, only the server-platform one the templates use.
+
+**Revisit when** Vite+ documents a stable way for a plugin to reach Vite's API, or its alias starts reporting a Vite version.
+
+## 70. Parse with the TypeScript @angular/compiler-cli uses, not the one `typescript` resolves to
+
+*17 November 2026*
+
+**Decision.** The plugin's own TypeScript parsing, for HMR candidates and for mapping type-check errors to templates, loads `typescript` through `@angular/compiler-cli`'s location ([typescript.ts](../packages/vite-plugin-ngp/src/typescript.ts)) instead of `import ts from 'typescript'`.
+
+**Why.** The plugin depends on TypeScript 7 for its type-check CLI, as the alias `typescript7: npm:typescript@7.0.2` ([decision 29](#29-type-check-with-tsgo-over-the-apps-sources-and-ngps-type-check-blocks-in-a-child-process)), and peer-depends on TypeScript 6. pnpm 11 and later link the alias's package under its real name, `typescript`, inside the plugin, and resolve the peer to it, even though 7.0.2 is outside `>=6.0 <6.1`; neither an override nor a package extension in the app changes that. TypeScript 7's main export has no parser API, so `ts.ScriptTarget.Latest` threw, and every template error crashed `vite build` instead of being reported. Vite+ 1.6.0 installs with pnpm 12, so every `vp create` app hit it. compiler-cli has no TypeScript of its own, so its `typescript` is the app's, with npm, yarn and every pnpm, and it's the copy Angular's compiler parses with anyway.
+
+**Cost.** One indirection to know about: a new `import 'typescript'` in the plugin would bring the bug back, and only the test that checks the plugin's TypeScript is compiler-cli's, plus the template-error check in create-ngp's Vite+ test, would catch it. pnpm 11 and later still print an unmet `typescript` peer warning for the plugin, which is now harmless.
+
+**Revisit when** TypeScript 7 publishes its CLI under a name of its own, so the alias can go.

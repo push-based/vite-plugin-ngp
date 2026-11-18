@@ -7,7 +7,8 @@
 // Angular's own (compiler-cli's `findSourceLocation` in typecheck/src/tcb_util.ts): from the node
 // at the error, walk up to the first node followed by a span comment.
 
-import ts from 'typescript';
+import type * as TS from 'typescript';
+import {ts} from './typescript.js';
 
 export interface Diagnostic {
   /** Absolute path. Undefined for diagnostics without a location, like a bad compiler option. */
@@ -89,7 +90,7 @@ export function locateInTemplate(tcb: string, line: number, column: number): Sou
   if (line < 1 || line > lineStarts.length) {
     return null;
   }
-  let node: ts.Node | undefined = tokenAt(sf, lineStarts[line - 1]! + column - 1);
+  let node: TS.Node | undefined = tokenAt(sf, lineStarts[line - 1]! + column - 1);
   let span: {start: number; end: number} | null = null;
   while (node && !ts.isFunctionDeclaration(node) && !ts.isSourceFile(node)) {
     const comment = trailingComment(tcb, node);
@@ -144,10 +145,10 @@ function templateSources(tcb: string): Record<string, TemplateSource> {
 }
 
 /** The innermost node whose text, not counting leading trivia, contains `pos`. */
-function tokenAt(sf: ts.SourceFile, pos: number): ts.Node {
-  let node: ts.Node = sf;
+function tokenAt(sf: TS.SourceFile, pos: number): TS.Node {
+  let node: TS.Node = sf;
   for (;;) {
-    const child: ts.Node | undefined = node.forEachChild((c) => (c.getStart(sf) <= pos && pos < c.end ? c : undefined));
+    const child: TS.Node | undefined = node.forEachChild((c) => (c.getStart(sf) <= pos && pos < c.end ? c : undefined));
     if (!child) {
       return node;
     }
@@ -156,7 +157,7 @@ function tokenAt(sf: ts.SourceFile, pos: number): ts.Node {
 }
 
 /** The text of the first `/* *\/` comment right after `node`, if any. */
-function trailingComment(text: string, node: ts.Node): string | null {
+function trailingComment(text: string, node: TS.Node): string | null {
   return (
     ts.forEachTrailingCommentRange(text, node.end, (pos, end, kind) =>
       kind === ts.SyntaxKind.MultiLineCommentTrivia ? text.slice(pos + 2, end - 2) : undefined,

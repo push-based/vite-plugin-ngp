@@ -80,6 +80,24 @@ async function fetchFrom(cwd, command, args, port, path, headers = {}) {
 
 const html = {Accept: 'text/html'};
 
+/**
+ * Plants a template error, builds, and checks the build fails with TypeScript's message at the
+ * template. A plugin that loads the wrong TypeScript throws instead (pnpm 11 and later, under Vite+).
+ */
+function assertTemplateErrorFailsBuild(dir, command, args) {
+  const file = join(dir, 'src', 'app', 'app.html');
+  const template = readFileSync(file, 'utf8');
+  writeFileSync(file, template.replace('clicks()', 'clickz()'));
+  try {
+    const result = spawnSync(command, args, {cwd: dir, env, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024});
+    const output = result.stdout + result.stderr;
+    assert.notEqual(result.status, 0, `the build passed with a template error:\n${output}`);
+    assert.match(output, /app\.html:\d+:\d+ - error TS2551: Property 'clickz' does not exist on type 'App'/);
+  } finally {
+    writeFileSync(file, template);
+  }
+}
+
 describe('scaffolded apps', {skip: noNgp}, () => {
   before(() => {
     // The plugin as npm would ship it, minus the four-engine check its prepack makes.
@@ -91,6 +109,7 @@ describe('scaffolded apps', {skip: noNgp}, () => {
     it('app: installs, builds, passes its spec, and serves compiled components', async () => {
       const dir = scaffoldApp('vite-app', 'app');
       sh(dir, 'pnpm', ['install']);
+      assertTemplateErrorFailsBuild(dir, 'pnpm', ['run', 'build']);
       sh(dir, 'pnpm', ['run', 'build']);
       assert.ok(existsSync(join(dir, 'dist', 'index.html')));
       assert.match(sh(dir, 'pnpm', ['test']), /1 passed/);
@@ -117,7 +136,7 @@ describe('scaffolded apps', {skip: noNgp}, () => {
       ['app', 5284],
       ['app-ssr', 5285],
     ]) {
-      it(`${template}: migrates, then passes vp check, vp build and vp test`, async () => {
+      it(`${template}: migrates, then passes vp check, vp build and vp test, and reports a template error`, async () => {
         const dir = scaffoldApp(`vp-${template}`, template);
         sh(dir, 'git', ['init', '-q']);
         sh(dir, 'vp', ['migrate', '--no-interactive', '--no-agent', '--no-editor']);
@@ -127,6 +146,8 @@ describe('scaffolded apps', {skip: noNgp}, () => {
         // vp create formats the project after the template exits; vp migrate leaves that to you.
         sh(dir, 'vp', ['check', '--fix']);
         sh(dir, 'vp', ['check']);
+        // Before the real build: a failed build empties dist.
+        assertTemplateErrorFailsBuild(dir, 'vp', ['build']);
         sh(dir, 'vp', ['build']);
         assert.match(sh(dir, 'vp', ['test', 'run']), /1 passed/);
         if (template === 'app-ssr') {

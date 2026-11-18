@@ -29,6 +29,7 @@ A first version on top of a prototype compiler. Everything below was checked in 
 - Vitest with TestBed, compiling only the specs a run asks for.
 - `fileReplacements`, `budgets` and `polyfills` from angular.json, and one app at a time in an Nx workspace.
 - Builds and test runs reuse compiled output from the last run, for every module whose inputs haven't changed.
+- Vite+: `vp create @push-based/ngp` for a new app, `vp migrate` for an existing one, then `vp dev`, `vp build`, `vp test` and `vp check`.
 
 **Not yet:** preprocessors in inline `styles`, HTTP status codes from SSR, the service worker, library builds, and Windows outside WSL 2, which is untested.
 

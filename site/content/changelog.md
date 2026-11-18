@@ -13,6 +13,14 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 
 - `npm create @push-based/ngp`, or `vp create @push-based/ngp` with Vite+, scaffolds an Angular app on the plugin: the app [Getting started](getting-started) describes, with routing, a Vitest spec on the server platform, and an `app-ssr` template that renders on the server and hydrates. The scaffolder is a new package, `@push-based/create-ngp`, released with the plugin at the same version, and it pins the plugin and Angular to the versions released together. [Using Vite+](vite-plus#create-a-new-app)
 
+### Fixes
+
+- Under pnpm 11 and later, which Vite+ installs with, a template type error made `vite build` and `vp build` fail with "Cannot read properties of undefined (reading 'Latest')" instead of reporting the error, and a `.ts` edit in the dev server hit the same error. pnpm linked the TypeScript 7 the plugin carries for its type-check under the name `typescript` inside the plugin. The plugin now parses with the TypeScript `@angular/compiler-cli` uses, your TypeScript 6. [Using Vite+](vite-plus#limits)
+
+### Docs
+
+- [Using Vite+](vite-plus) now covers moving an existing app with `vp migrate`, including the esbuild install script pnpm 11 and later stop on, what `vp check`, `vp test` and `vpx ngp-extract-i18n` do with an Angular app, and server rendering under `vp dev` and `vp build`. CI runs both templates under Vite+ on every change.
+
 ## 17 November 2026
 
 ### Angular
