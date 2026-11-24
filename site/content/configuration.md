@@ -110,8 +110,9 @@ On the server, `zone.js` becomes `zone.js/node`. A zoneless app, which is what `
 You don't configure these, but they explain what you see when you debug:
 
 - `define`: `ngJitMode`, `ngDevMode`, `ngServerMode`, `ngHmrMode` and `ngI18nClosureMode`, as [How it works](how-it-works) lists.
-- `optimizeDeps.rolldownOptions.plugins`: Angular's linker, for dependency pre-bundling.
+- `optimizeDeps.rolldownOptions.plugins`: Angular's linker, for the browser's dependency pre-bundling.
 - With `ssr`, in the dev server: `optimizeDeps` for the `ssr` environment, with discovery on, so the server's Angular libraries are pre-bundled and linked once into `node_modules/.vite/deps_ssr`. Its Rolldown plugins keep everything that isn't an Angular library out of the bundle, bake the server's `define` values in, and delete the bundle's source maps. See [Server rendering](server-rendering#what-the-plugin-does).
+- In the dev server, every other server environment, such as the Worker environment `@cloudflare/vite-plugin` adds: Angular's linker in that environment's `optimizeDeps.rolldownOptions.plugins`, next to the plugins its owner sets. The rest of its optimizer stays as its owner configured it.
 - `build.rolldownOptions.treeshake.manualPureFunctions`: `forwardRef`, so unused `forwardRef(...)` calls can be dropped, as `ng build` does. The rest of the build optimizer is a transform and needs no configuration.
 - `resolve.noExternal` in server environments: every `@angular/*` package, plus every package in your `dependencies` that depends on `@angular/core`, so Angular libraries get bundled and linked instead of loaded unlinked by Node. An Angular library under `devDependencies` stays external; add it to `resolve.noExternal` yourself.
 - A dev-server middleware that answers `/@ng/component` requests with component updates.

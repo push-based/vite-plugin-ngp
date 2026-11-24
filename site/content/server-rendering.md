@@ -85,4 +85,5 @@ for (const route of routes) {
 
 - **No status codes.** `render` returns HTML only. Behind a Node server, a not-found page answers 200. Angular's way to set the status, `@angular/ssr`'s request and response tokens, isn't wired up.
 - **No `@angular/ssr` features.** Per-route render modes and `AngularNodeAppEngine` aren't supported. You write the server, or the prerender loop, yourself.
+- **The `ssr` option means Node.** It adds a Node middleware, a server build input and output folder, and a pre-bundle that leaves non-Angular packages for Node to load. When another plugin owns the server environment, such as `@cloudflare/vite-plugin` running it in workerd, leave `ssr` off and list the server entry in `entries`. The plugin still compiles that environment's components for the server and links its Angular libraries, in the dev server and in builds.
 - **Two analyzers in dev.** The browser and server compilers each hold an ngp analyzer, so SSR roughly doubles the dev server's analyzer memory.

@@ -607,8 +607,17 @@ function compilerPlugin(
         define: {ngServerMode: 'true', ngHmrMode: 'false'},
         resolve: {noExternal},
         // In the dev server, pre-bundle those libraries once, linked, into the cache directory,
-        // instead of linking and transforming them again on every start.
-        ...(serve && !testing && ssrEntry && name === 'ssr' ? {optimizeDeps: serverOptimizeDeps(noExternal)} : {}),
+        // instead of linking and transforming them again on every start. A server environment the
+        // plugin doesn't own, like a Cloudflare Worker's, may still pre-bundle them with its own
+        // optimizer, so it gets the linker there too.
+        ...(serve && !testing
+          ? {
+              optimizeDeps:
+                ssrEntry && name === 'ssr'
+                  ? serverOptimizeDeps(noExternal)
+                  : {rolldownOptions: {plugins: [linkerRolldownPlugin()]}},
+            }
+          : {}),
       };
     },
 
@@ -983,7 +992,8 @@ function fileReplacementsPlugin(fileReplacements: NonNullable<NgpPluginOptions['
 }
 
 const LINKER_FILTER = {
-  id: {include: /\.[cm]?js$/, exclude: /[\\/]node_modules[\\/]\.vite[\\/]/},
+  // The dev server asks for dependencies it serves unbundled with a query, like `?v=6288c9a3`.
+  id: {include: /\.[cm]?js(?:[?#]|$)/, exclude: /[\\/]node_modules[\\/]\.vite[\\/]/},
   code: LINKER_MARKER,
 };
 
