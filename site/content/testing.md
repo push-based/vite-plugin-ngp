@@ -20,7 +20,7 @@ pnpm add -D vitest@5.0.4
 `ServerTestingModule` imports `@angular/platform-browser-dynamic/testing`, which `@angular/platform-server` doesn't list as a dependency. An app that renders on the server has it installed already; otherwise add it at your Angular version. npm prints a deprecation notice for it, which is Angular's: the package is deprecated for apps, and `ServerTestingModule` still imports it.
 
 ```bash
-pnpm add -D @angular/platform-browser-dynamic@22.3.0-rc.0
+pnpm add -D @angular/platform-browser-dynamic@22.3.0
 ```
 
 `vitest.config.ts`, next to your `vite.config.ts`:

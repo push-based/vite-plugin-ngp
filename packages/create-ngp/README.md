@@ -25,7 +25,7 @@ create-ngp [directory] [--template app|app-ssr] [--overwrite] [--no-interactive]
 
 Under Vite+, put the scaffolder's options after `--`: `vp create @push-based/ngp -- my-app --template app-ssr`. [Using Vite+](https://push-based.github.io/vite-plugin-ngp/vite-plus/) has the details, and the [status page](https://push-based.github.io/vite-plugin-ngp/status/) says what the plugin does and doesn't do yet.
 
-The app pins `@push-based/vite-plugin-ngp` at this package's version, which is released together with it, and every `@angular/*` package at the exact Angular release the plugin's ngp build came from.
+The app pins `@push-based/vite-plugin-ngp` at this package's version, which is released together with it, and every `@angular/*` package at the Angular release the plugin's ngp build came from. The app can move to any Angular the plugin accepts: see the [compatibility page](https://push-based.github.io/vite-plugin-ngp/compatibility/).
 
 ## License
 

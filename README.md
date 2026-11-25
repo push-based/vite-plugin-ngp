@@ -33,11 +33,11 @@ A first version on top of a prototype compiler. Everything below was checked in 
 
 **Not yet:** preprocessors in inline `styles`, HTTP status codes from SSR, the service worker, library builds, and Windows outside WSL 2, which is untested.
 
-**The catch.** It's on npm as [`@push-based/vite-plugin-ngp`](https://www.npmjs.com/package/@push-based/vite-plugin-ngp), but ngp isn't published, so the package carries its own build of it, made from Angular's source, and every `@angular/*` package is pinned to exactly `22.3.0-rc.0`. The plugin also uses ngp below its intended surface, so any Angular commit can break it. The [status page](https://push-based.github.io/vite-plugin-ngp/status/) lists every limit.
+**The catch.** It's on npm as [`@push-based/vite-plugin-ngp`](https://www.npmjs.com/package/@push-based/vite-plugin-ngp), but ngp isn't published, so the package carries its own build of it, made from Angular's source, and it runs on Angular 22.3 only, from `22.3.0-rc.0` on. The plugin also uses ngp below its intended surface, so any Angular commit can break it. The [status page](https://push-based.github.io/vite-plugin-ngp/status/) lists every limit.
 
 ## Try it
 
-You need macOS or Linux, Node 26, and every `@angular/*` package pinned to exactly `22.3.0-rc.0`. To start a new app, let the scaffolder write it:
+You need macOS or Linux, Node 26, and Angular 22.3 ([which releases](https://push-based.github.io/vite-plugin-ngp/compatibility/)). To start a new app, let the scaffolder write it:
 
 ```bash
 npm create @push-based/ngp@latest

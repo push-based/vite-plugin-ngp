@@ -4,7 +4,7 @@ vite-plugin-ngp lets Vite compile Angular one module at a time, using ngp, the R
 
 This page is for whoever builds or reviews the plugin next. It covers why the plugin exists, how it works today, what it doesn't do yet, and where the design is weakest. The evidence behind each choice lives in [ng-hybrid-preprocessor-bench](https://github.com/push-based/ng-hybrid-preprocessor-bench), mainly its [Vite plugin investigation](https://github.com/push-based/ng-hybrid-preprocessor-bench/blob/main/docs/vite-plugin-investigation.md). Individual choices are logged in [decisions.md](decisions.md).
 
-Snapshot: 16 October 2026, with the Angular pin moved on 17 November 2026. ngp built from Angular `9f2e1aa` (`22.3.0-rc.0`), Vite 8.3.4, Node 26.12.0.
+Snapshot: 16 October 2026, with the Angular pin moved on 17 November 2026 and the package's Angular range widened on 25 November 2026. ngp built from Angular `9f2e1aa` (`22.3.0-rc.0`), Vite 8.3.4, Node 26.12.0.
 
 ## Why build it
 
@@ -121,7 +121,7 @@ Verified in the [playground](../playground): `vite build` and `vite preview`, de
 
 ## Where it's weak
 
-- **ngp is a prototype, and the plugin uses it as one.** The plugin types the API by hand and reaches into `HybridCompiler.applyInvalidations`, `analyzer.updateFileContent` and `analyzer.invalidateFiles`, below the public `updateFileContent` that runs the delta. Any Angular commit can break that. Pinning Angular to exactly `22.3.0-rc.0` holds it still for now.
+- **ngp is a prototype, and the plugin uses it as one.** The plugin types the API by hand and reaches into `HybridCompiler.applyInvalidations`, `analyzer.updateFileContent` and `analyzer.invalidateFiles`, below the public `updateFileContent` that runs the delta. Any Angular commit can break that. The repo holds it still by pinning Angular to exactly `22.3.0-rc.0`. The package accepts `>=22.3.0-rc.0 <22.4.0`, measured at both ends of what exists today, and CI runs the newest release in that range ([decision 72](decisions.md)). A 22.3 patch can still break it between two CI runs.
 - **It ships an unofficial ngp.** The npm package carries ngp built from Angular's source by our CI, with native engines for macOS and glibc Linux only ([decision 60](decisions.md#60-ngp-ships-inside-the-plugins-package-with-a-native-engine-for-four-platforms)). Everywhere else needs the slower wasm engine, and moving to another Angular commit means a new plugin release.
 - **The output cache's key is a list someone wrote down.** It hashes the analyzer's whole result for a file, so anything the analyzer knows is covered, but an input ngp reads from somewhere else, such as a file the analyzer doesn't report, would be missed, and a hit on a stale entry is a wrong module with no error. Each known input has a test; `cache: false` is the check for an unknown one.
 - **File changes are tested on one small app.** The test app has three components. Nobody has added or deleted a file in a large app, deleted a whole directory, or moved files with a tool that writes them seconds apart. Deleting a component that's still used fails with ngp's "'app-greeting' is not a known element", which names the element but not the missing file; Vite's own "Failed to resolve import" would, but ngp runs first. A missing `styleUrl` file isn't checked at all.

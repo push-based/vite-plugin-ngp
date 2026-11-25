@@ -7,7 +7,9 @@
 //   - every page has a title and a description in its front matter;
 //   - every link between pages, in the markdown and on the home page, points at a page and a
 //     heading that exist;
-//   - every figure a page embeds exists next to it.
+//   - every figure a page embeds exists next to it;
+//   - content/compatibility.md gives each of the plugin's peer ranges, and its Node range, as
+//     package.json declares it.
 //
 // Usage: node site/scripts/check-docs.ts
 
@@ -125,6 +127,23 @@ for (const {from, href} of links) {
     problems.push(`${from} links to '${href}', but there's no page '${page}'`);
   } else if (fragment && !ids.get(page)!.has(fragment)) {
     problems.push(`${from} links to '${href}', but '${page}' has no heading with id '${fragment}'`);
+  }
+}
+
+// 5. The ranges on the Compatibility page against the plugin's package.json. Every peer, and the
+// Node range, has to be on the page as written, and the Angular peers have to share one range.
+const pkg = JSON.parse(await readFile(path.join(repo, 'packages/vite-plugin-ngp/package.json'), 'utf8')) as {
+  peerDependencies: Record<string, string>;
+  engines: {node: string};
+};
+const compatibility = await readFile(path.join(site, 'content/compatibility.md'), 'utf8');
+const angularRanges = new Set(Object.entries(pkg.peerDependencies).filter(([name]) => name.startsWith('@angular/')).map(([, range]) => range));
+if (angularRanges.size !== 1) {
+  problems.push(`the plugin's @angular/* peers have different ranges (${[...angularRanges].join(', ')}): they move together`);
+}
+for (const [name, range] of [...Object.entries(pkg.peerDependencies), ['node', pkg.engines.node]]) {
+  if (!compatibility.includes(`\`${range}\``)) {
+    problems.push(`the plugin's package.json accepts ${name} \`${range}\`, but site/content/compatibility.md doesn't say so`);
   }
 }
 

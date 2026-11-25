@@ -7,7 +7,7 @@ description: Where each angular.json build option goes when an app moves from ng
 
 You have an app that `ng build` builds from angular.json, with the `@angular/build:application` builder, and you want to know whether it can move to Vite with this plugin. Most of angular.json's build options become Vite config you'd write for any Vite app. Three have no Vite equivalent, so the plugin takes them, under the same names and in the same shapes: `fileReplacements`, `budgets` and `polyfills`. The project's `i18n` block and the `localize` option become the plugin's `i18n` option. A handful of options can't move at all yet.
 
-Check [Can't move yet](migrating-from-ng-build#cant-move-yet) first. If your production build depends on any of those, stay on `ng build` for now. Then follow [Getting started](getting-started) for the toolchain, the pinned Angular version and `index.html`, and come back here for the rest. If the app lives in an Nx workspace, [Migrating inside an Nx workspace](nx) adds what the workspace needs: Vite's root, tsconfig paths and the libraries the app imports.
+Check [Can't move yet](migrating-from-ng-build#cant-move-yet) first. If your production build depends on any of those, stay on `ng build` for now. Then follow [Getting started](getting-started) for the toolchain, the Angular version and `index.html`, and come back here for the rest. If the app lives in an Nx workspace, [Migrating inside an Nx workspace](nx) adds what the workspace needs: Vite's root, tsconfig paths and the libraries the app imports.
 
 ## Configurations become modes
 

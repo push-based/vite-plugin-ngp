@@ -5,7 +5,7 @@ description: Install @push-based/vite-plugin-ngp from npm and serve your Angular
 
 # Getting started
 
-This page takes you from an Angular app to the same app served by Vite through vite-plugin-ngp. Plan on about five minutes. You'll need to pin exact Angular versions, because the ngp build inside the package only works with the Angular release it was built from.
+This page takes you from an Angular app to the same app served by Vite through vite-plugin-ngp. Plan on about five minutes. Your app needs to be on Angular 22.3.
 
 > [!TIP]
 > Starting a new app? `npm create @push-based/ngp@latest`, or `vp create @push-based/ngp` with [Vite+](vite-plus), writes the app this page describes, with a spec and an optional server-rendering setup.
@@ -16,7 +16,7 @@ This page takes you from an Angular app to the same app served by Vite through v
 |---|---|
 | Operating system | macOS (arm64 or x64) or Linux with glibc (x64 or arm64), WSL 2 included. Anywhere else, Alpine included, set `engine: 'wasm'` ([Configuration](configuration)). Windows itself is untested |
 | Node | 26 |
-| Angular | Exactly `22.3.0-rc.0` |
+| Angular | 22.3: `22.3.0-rc.0` or later, below `22.4.0`. [Compatibility](compatibility) has the range for each plugin version and how it was checked |
 
 You don't need Rust or a clone of the repo. Angular hasn't published ngp, so the package carries its own build of it, made from Angular's source at the commit behind `22.3.0-rc.0`, with a native engine for each platform above.
 
@@ -28,20 +28,19 @@ npm install -D @push-based/vite-plugin-ngp vite@8.3.4
 
 With pnpm, `pnpm add -D` takes the same two packages.
 
-> [!WARNING]
-> Pin every `@angular/*` package to exactly `22.3.0-rc.0`, the release built from the same commit as ngp. Any other version fails, because ngp imports private APIs from `@angular/compiler-cli`.
+Keep every `@angular/*` package on the same 22.3 release. An older Angular fails when ngp loads, because ngp imports names `@angular/compiler` first exported in `22.3.0-rc.0`.
 
 ```json title="package.json"
 {
   "dependencies": {
-    "@angular/common": "22.3.0-rc.0",
-    "@angular/compiler": "22.3.0-rc.0",
-    "@angular/core": "22.3.0-rc.0",
-    "@angular/platform-browser": "22.3.0-rc.0",
-    "@angular/router": "22.3.0-rc.0"
+    "@angular/common": "~22.3.0",
+    "@angular/compiler": "~22.3.0",
+    "@angular/core": "~22.3.0",
+    "@angular/platform-browser": "~22.3.0",
+    "@angular/router": "~22.3.0"
   },
   "devDependencies": {
-    "@angular/compiler-cli": "22.3.0-rc.0",
+    "@angular/compiler-cli": "~22.3.0",
     "typescript": "6.0.3"
   }
 }

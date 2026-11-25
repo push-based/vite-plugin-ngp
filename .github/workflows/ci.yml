@@ -1,5 +1,6 @@
 # Builds ngp from source, then the plugin, its tests, create-ngp's apps with and without Vite+, the
 # playground's Vitest specs and the playground itself, on a clean machine.
+# Then the tests, the specs and the playground build once more, on the newest Angular the plugin accepts.
 # This is the check that the build instructions in docs/building.md work.
 name: ci
 
@@ -60,3 +61,20 @@ jobs:
       # `pnpm test` above also runs the docs check (site/scripts/check-docs.ts). This makes sure the
       # site itself builds and prerenders, so a broken page fails CI before it fails a deploy.
       - run: pnpm site:build
+
+      # Everything above ran on the Angular release ngp is built from. The package accepts a range
+      # (site/content/compatibility.md), so the last steps move the workspace to the newest release
+      # in it and run the plugin's tests, the specs and the build again, with the plugin and the ngp
+      # build made above. toolchain/out sits in the workspace, so ngp loads the @angular/compiler
+      # installed here, as it does from an app's node_modules.
+      - run: node packages/vite-plugin-ngp/scripts/use-angular.mjs newest
+
+      - run: pnpm install --no-frozen-lockfile
+
+      - name: Tests, specs and build on the newest Angular the plugin accepts
+        env:
+          NGP_TOOLCHAIN: ${{ github.workspace }}/toolchain/out
+        run: |
+          pnpm --filter @push-based/vite-plugin-ngp test
+          pnpm --filter playground test
+          pnpm --filter playground build

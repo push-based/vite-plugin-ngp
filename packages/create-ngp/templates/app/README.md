@@ -11,4 +11,4 @@ An Angular app built by [vite-plugin-ngp](https://push-based.github.io/vite-plug
 
 With Vite+, use `vp dev`, `vp build`, `vp preview` and `vp test`.
 
-Every `@angular/*` package is pinned to one exact version, the release the plugin's ngp build was made from. Upgrade them together with the plugin, never on their own. The [status page](https://push-based.github.io/vite-plugin-ngp/status/) lists what works and what doesn't.
+Every `@angular/*` package is pinned to the release the plugin's ngp build was made from. To move Angular, change them all together, to a release the [compatibility page](https://push-based.github.io/vite-plugin-ngp/compatibility/) lists for your plugin version. The [status page](https://push-based.github.io/vite-plugin-ngp/status/) lists what works and what doesn't.

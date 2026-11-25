@@ -92,6 +92,8 @@ Each entry records one choice: what we decided, why, what it costs, and when to 
 
 **Cost.** Moving to a newer Angular means rebuilding ngp at that commit and updating every pin together. It isn't mechanical: the three weeks between `22.3.0-next.2` and `22.3.0-next.4` changed how the analyzer treats a file that comes back after a delete, which the plugin had to answer (decision 25), and gave ngp Angular's extended diagnostics, which the plugin now reports. The move from `22.3.0-next.4` to `22.3.0-rc.0` broke three things. ngp's HMR helpers moved into `@angular/compiler`, which next.4 doesn't export, so ngp from that commit doesn't build against older packages. `getTcbForFile` became async when upstream dropped the synchronous APIs. And `HybridCompiler` started keeping each file's analyzer metadata in a second cache, so clearing `fileCache` alone left type-check blocks built from the file as it was before the edit. Pinning ngp and the packages to the same release keeps all three from reaching users.
 
+**Update, 25 November 2026.** This now holds for the repo only: its own `@angular/*` versions, create-ngp's templates and `toolchain/versions.env`. The package's peers are a range ([decision 72](#72-accept-a-range-of-angular-in-the-package-and-keep-the-repos-own-versions-exact)). The reason above is also out of date. At `9f2e1aa`, `hybrid_analysis` is imported only by ngp's `language-service/` folder, which [tsconfig.backend.json](../toolchain/tsconfig.backend.json) doesn't compile. The backend the package ships imports `@angular/compiler` and `typescript`. The repo stays exact because the backend is compiled against the installed `@angular/compiler` and needs the names that commit exports.
+
 ## 9. JIT fallback in the playground until there's a linker
 
 *Superseded by 12.*
@@ -857,3 +859,23 @@ A disk cache of the linker's output, keyed by file content and Angular version, 
 **Cost.** One more option, with switches to document one by one. A spec run with `jitCompat` links libraries differently from the build, so a bug that only shows in AOT-linked code can pass a spec. Turning a switch on costs one cache rebuild for what it changes.
 
 **Revisit when** ngp grows a test mode of its own that covers these, or when Angular's own Vitest runner settles on a set of JIT-compatibility switches to match.
+
+## 72. Accept a range of Angular in the package, and keep the repo's own versions exact
+
+*25 November 2026*
+
+**Decision.** The plugin's Angular peers are `>=22.3.0-rc.0 <22.4.0`, not the one release ngp is built from. The repo's own `@angular/*` versions, create-ngp's templates and `toolchain/versions.env` stay exact ([decision 8](#8-pin-angular-to-one-exact-prerelease)). The site's Compatibility page gives the range for each plugin version, and `pnpm docs:check` fails when the page and the plugin's `package.json` disagree. CI's last steps move the workspace to the newest release in the range ([use-angular.mjs](../packages/vite-plugin-ngp/scripts/use-angular.mjs)) and run the plugin's tests, the playground's specs and its build again, without rebuilding the plugin or ngp.
+
+**Why.** Angular `22.3.0` shipped, and the exact peer turned it away: an app on the stable release got a peer conflict, and libraries whose peer is `^22.0.0` reject the prerelease the docs asked for. The reason for the exact peer was gone too (the update on decision 8). So the range was measured, on 25 November 2026, with the plugin built once and the ngp build from `9f2e1aa` loading `@angular/compiler` from the release under test:
+
+| Angular | Plugin tests | Playground specs | Playground build |
+|---|---|---|---|
+| `22.3.0-next.4` | 85 of 145 pass | fail | fails |
+| `22.3.0-rc.0` | 145 of 145 | 33 of 33 | builds |
+| `22.3.0` | 145 of 145 in 22 of 25 runs | 33 of 33 | builds |
+
+On `22.2.7` and on `22.3.0-next.0` to `next.4`, ngp doesn't load: `@angular/compiler` there has no `PotentialTopLevelReadsVisitor` export (`IndexerVisitor` on `next.0`). That makes `22.3.0-rc.0` the floor. The ceiling is a judgment: `22.3.0` was the newest release, patches of 22.3 are fixes only, and the two moves inside the 22.3 prereleases each broke something, so 22.4 stays out until it's run.
+
+**Cost.** A 22.3 patch nobody has run installs without a warning. `@angular/compiler` isn't a public API, so a patch can change a name ngp imports, and CI finds that on its next run, not before. The CI steps add a second install of Angular and a second run of the tests to every run. The range is measured on the playground, not on the real apps in `bench/`. One test is open: `middleware-mode.test.mjs` got a 404 for its page in 3 of 25 runs of the plugin's tests on `22.3.0`, and in none of 11 on `22.3.0-rc.0`. It passed 12 times of 12 on its own on `22.3.0`, and the cause isn't found, so the new CI steps can fail on it. And the measurement is easy to get wrong: ngp loads `@angular/compiler` from wherever its own files sit, so with `NGP_TOOLCHAIN` pointing at a build in another checkout, every Angular release "passes", because ngp never sees it. The first run here made that mistake. The build under test has to sit inside the workspace, as `toolchain/out` does in CI and as the bundled build does in an app's `node_modules`.
+
+**Revisit when** Angular 22.4 has a prerelease: the ceiling moves only with a run, and probably an ngp build from that commit. Also when Angular publishes ngp, which would bring its own peer range, and when the ngp build moves to the `22.3.0` commit, so the templates can scaffold on the stable release.
