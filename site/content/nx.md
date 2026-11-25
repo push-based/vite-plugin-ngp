@@ -83,7 +83,7 @@ Nx can also build a library on its own: `@nx/angular:package` runs ng-packagr an
 
 What to do depends on why the library is buildable:
 
-- **To publish it.** Keep `nx build my-lib`. ng-packagr publishes a version next to every Angular version, but it can lag. Today it doesn't: its newest prerelease is `22.3.0-rc.0`, the version the plugin pins, so pin ng-packagr to it as well. That's as far as it was checked: nobody has run it in this repo.
+- **To publish it.** Keep `nx build my-lib`. ng-packagr publishes a version next to every Angular version, but it can lag. Today it doesn't: `22.3.0-rc.0` and `22.3.0` are both on npm, so use the ng-packagr of your Angular version. That's as far as it was checked: nobody has run it in this repo.
 - **For incremental builds, so the app doesn't recompile it.** Point the alias at the library's source, `libs/<name>/src/index.ts`, instead of `dist/libs/<name>`. The plugin compiles a file when it's asked for, so there's nothing to gain from building the library ahead of the app, and an edit in the library updates the page in place instead of waiting for `nx build my-lib`.
 - **To consume it built, from `dist/`.** Untested. It should work: the plugin's linker runs on any JavaScript module that contains partially compiled declarations, wherever it lives, in builds and in the dev server's transform. What's untested is whether Vite's dependency pre-bundling in the dev server sees an aliased `dist/` folder, which decides whether the library is linked once at startup or per module.
 
@@ -133,4 +133,4 @@ Plus the two source patches the Benchmarks page describes: one `export type`, an
 
 - **One workspace, two libraries, 157 components.** A workspace with fifty libraries, or one where apps import each other's code through aliases, hasn't been tried. The alias function handles what Nx writes and nothing more.
 - **Nx's own Vite integration is untested.** `@nx/vite`'s executors and target inference may well work, since they run Vite with a config file, but nobody has checked, and Nx's cache needs `outputs` and `inputs` that the example above only starts on.
-- **Libraries built with ng-packagr are out of scope.** A workspace that publishes libraries runs two toolchains, and the pinned prerelease of ng-packagr hasn't been run here.
+- **Libraries built with ng-packagr are out of scope.** A workspace that publishes libraries runs two toolchains, and ng-packagr hasn't been run here.

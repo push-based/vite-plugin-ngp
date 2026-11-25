@@ -22,6 +22,7 @@ When you add or change anything a user of the plugin would see, update the match
 | A number measured with `bench/` on a real app, or how the real apps are set up | `site/content/benchmarks.md`, its figures (same command), and `bench/README.md` |
 | What works, what doesn't, a new limit or a fixed one | `site/content/status.md` |
 | Setup steps, required versions | `site/content/getting-started.md` |
+| A peer range or `engines` in the plugin's `package.json`, the Angular release ngp is built from, or which releases a range was run on | `site/content/compatibility.md` |
 | The scaffolder (`packages/create-ngp`), its templates or options, or how the plugin runs under Vite+ | `site/content/vite-plus.md` |
 | How the repo builds ngp, `toolchain/`, what goes in the package | `docs/building.md` |
 | A number on the home page, or the home page's claims | `site/src/app/pages/home.ts` and `home.html` |
@@ -38,7 +39,7 @@ pnpm docs:check
 pnpm site:build
 ```
 
-`pnpm docs:check` (also part of `pnpm test`, and of CI) fails when a plugin option has no row in the Configuration table, when a page isn't in the sidebar or a sidebar entry has no page, when a page has no title or description, and when a link between pages points at a page or heading that doesn't exist. It can't tell whether what a page *says* is still true. That part is on you: reread the pages your change touches.
+`pnpm docs:check` (also part of `pnpm test`, and of CI) fails when a plugin option has no row in the Configuration table, when the Compatibility page doesn't give a range the plugin's `package.json` declares, when a page isn't in the sidebar or a sidebar entry has no page, when a page has no title or description, and when a link between pages points at a page or heading that doesn't exist. It can't tell whether what a page *says* is still true. That part is on you: reread the pages your change touches.
 
 ```bash
 git push

@@ -9,6 +9,10 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 
 ## 25 November 2026
 
+### Angular
+
+- The plugin now accepts every Angular 22.3 release from `22.3.0-rc.0` on, `22.3.0` included, instead of exactly `22.3.0-rc.0`. Before, an app on `22.3.0` got a peer dependency conflict on install, and the docs told you to pin a release candidate. Older releases still fail when ngp loads, and 22.4 stays out until it has been run. The new page has the range for each plugin version and the runs behind it. [Compatibility](compatibility)
+
 ### New apps
 
 - `npm create @push-based/ngp`, or `vp create @push-based/ngp` with Vite+, scaffolds an Angular app on the plugin: the app [Getting started](getting-started) describes, with routing, a Vitest spec on the server platform, and an `app-ssr` template that renders on the server and hydrates. The scaffolder is a new package, `@push-based/create-ngp`, released with the plugin at the same version, and it pins the plugin and Angular to the versions released together. [Using Vite+](vite-plus#create-a-new-app)

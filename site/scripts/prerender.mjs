@@ -55,7 +55,7 @@ const sections = [...new Set(docs.map((d) => d.section))];
 const llms = [
   '# vite-plugin-ngp',
   '',
-  "> A Vite plugin that compiles Angular one module at a time with ngp, Angular's Rust-and-TypeScript preprocessor. It's a prototype: ngp isn't on npm, so you build it from Angular's source, and every @angular/* package is pinned to an exact prerelease.",
+  "> A Vite plugin that compiles Angular one module at a time with ngp, Angular's Rust-and-TypeScript preprocessor. It's a prototype: ngp isn't on npm, so the package carries its own build of it, made from Angular's source, and it runs on Angular 22.3 only.",
   '',
   'Each link below is the page as markdown.',
   ...sections.flatMap((section) => [

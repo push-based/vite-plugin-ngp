@@ -45,6 +45,7 @@ export const DOCS: DocEntry[] = [
   {path: 'styles', label: 'Component styles', section: 'Features', load: () => import('../../content/styles.md').then((m) => m.default)},
   {path: 'i18n', label: 'Internationalization', section: 'Features', load: () => import('../../content/i18n.md').then((m) => m.default)},
   {path: 'status', label: 'Status and limits', section: 'Project', load: () => import('../../content/status.md').then((m) => m.default)},
+  {path: 'compatibility', label: 'Compatibility', section: 'Project', load: () => import('../../content/compatibility.md').then((m) => m.default)},
   {path: 'performance', label: 'Performance', section: 'Project', load: () => import('../../content/performance.md').then((m) => m.default)},
   {path: 'benchmarks', label: 'Benchmarks: real apps', section: 'Project', load: () => import('../../content/benchmarks.md').then((m) => m.default)},
   {path: 'changelog', label: 'Changelog', section: 'Project', load: () => import('../../content/changelog.md').then((m) => m.default)},

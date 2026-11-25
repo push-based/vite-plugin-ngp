@@ -65,7 +65,7 @@ Both are what `ng new` would give you, on Vite: standalone components, zoneless,
 | Scripts | `dev`, `build`, `preview`, `test` | `dev`, `build`, `start`, `test` |
 | Spec | `src/app/app.spec.ts`, under Vitest in Node on Domino | The same |
 
-Every `@angular/*` package is pinned to exactly `22.3.0-rc.0`, and the plugin to the scaffolder's own version: `@push-based/create-ngp` and the plugin are released together, at the same version. Upgrade the plugin and Angular together, from the [changelog](changelog), never one without the other.
+Every `@angular/*` package is pinned to `22.3.0-rc.0`, the release the plugin's ngp build was made from, and the plugin to the scaffolder's own version: `@push-based/create-ngp` and the plugin are released together, at the same version. You can move Angular to any release the plugin accepts, all `@angular/*` packages together: [Compatibility](compatibility) lists them.
 
 Each template also has a `pnpm-workspace.yaml` that only pnpm reads. The plugin depends on esbuild, which has an install script it doesn't need, and pnpm 11 and later stop the install over a build script nobody approved or denied; Vite+ 1.6.0 installs with pnpm 12. The file denies the script, so the install goes through. npm, yarn and bun ignore the file, and you can delete it if you don't use pnpm.
 

@@ -37,7 +37,7 @@ pnpm toolchain
 1. **Checks prerequisites** ([check-prereqs.sh](../toolchain/check-prereqs.sh)). If anything from the table above is missing, it stops before downloading anything and prints what to fix.
 2. **Fetches ngp's sources** ([fetch-angular.sh](../toolchain/fetch-angular.sh)). It does a sparse fetch of `packages/compiler-cli/preprocessor` plus the Cargo files at the pinned commit, about 1,500 files instead of the whole Angular repo.
 3. **Installs Rust** ([setup-rust.sh](../toolchain/setup-rust.sh)). It installs rustup with the pinned Rust version and the `wasm32` target, and builds `wasm-bindgen-cli` from source. This step is most of the first build's time.
-4. **Compiles the TypeScript backend** ([build-backend.sh](../toolchain/build-backend.sh)), with `tsc` against the `@angular/*` packages `pnpm install` just installed. They come from the same commit, which is why every Angular version in this repo is pinned exactly.
+4. **Compiles the TypeScript backend** ([build-backend.sh](../toolchain/build-backend.sh)), with `tsc` against the `@angular/*` packages `pnpm install` just installed. They come from the same commit, which is why every Angular version in this repo is pinned exactly. The published package accepts a range of Angular, and CI's last steps run the tests on the newest release in it ([decision 72](decisions.md)).
 5. **Builds the analyzer engines** ([build-engines.sh](../toolchain/build-engines.sh)) with Cargo: the native N-API addon, which the plugin uses by default, and the wasm build, the fallback for platforms without a native build.
 
 The result:

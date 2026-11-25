@@ -13,4 +13,4 @@ With Vite+, use `vp dev`, `vp build` and `vp test`. `server.mjs` is plain Node: 
 
 `server.mjs` renders only URLs on `localhost`: add your own hosts to `allowedHosts` in `src/main.server.ts`. The [Server rendering page](https://push-based.github.io/vite-plugin-ngp/server-rendering/) says what the plugin does and doesn't do, and the [status page](https://push-based.github.io/vite-plugin-ngp/status/) lists every limit.
 
-Every `@angular/*` package is pinned to one exact version, the release the plugin's ngp build was made from. Upgrade them together with the plugin, never on their own.
+Every `@angular/*` package is pinned to the release the plugin's ngp build was made from. To move Angular, change them all together, to a release the [compatibility page](https://push-based.github.io/vite-plugin-ngp/compatibility/) lists for your plugin version.
