@@ -1,3 +1,26 @@
+## 0.4.1 (2026-11-25)
+
+### 🚀 Features
+
+- **create-ngp:** scaffold an angular app on the plugin with npm create @push-based/ngp ([#43](https://github.com/push-based/vite-plugin-ngp/pull/43), [#14](https://github.com/push-based/vite-plugin-ngp/issues/14), [#18](https://github.com/push-based/vite-plugin-ngp/issues/18))
+- **vite-plugin-ngp:** add test.jitCompat so TestBed overrides keep NgModule scopes ([#51](https://github.com/push-based/vite-plugin-ngp/pull/51))
+- **vite-plugin-ngp:** add test.extendedDiagnostics to report extended checks as warnings ([#52](https://github.com/push-based/vite-plugin-ngp/pull/52))
+- **vite-plugin-ngp:** add test.runtimeScopes to drop scope errors TestBed resolves ([#53](https://github.com/push-based/vite-plugin-ngp/pull/53))
+- **vite-plugin-ngp:** keep @defer dependencies static under test.jitCompat ([#54](https://github.com/push-based/vite-plugin-ngp/pull/54))
+
+### 🩹 Fixes
+
+- **vite-plugin-ngp:** place external template diagnostics in the template ([#48](https://github.com/push-based/vite-plugin-ngp/pull/48))
+- **vite-plugin-ngp:** report template errors under pnpm 11 and vite+ instead of crashing ([#44](https://github.com/push-based/vite-plugin-ngp/pull/44), [#15](https://github.com/push-based/vite-plugin-ngp/issues/15), [#16](https://github.com/push-based/vite-plugin-ngp/issues/16))
+- **vite-plugin-ngp:** link angular libraries in server environments the plugin doesn't own ([#47](https://github.com/push-based/vite-plugin-ngp/pull/47), [#46](https://github.com/push-based/vite-plugin-ngp/issues/46))
+- **vite-plugin-ngp:** key the output cache on the preprocessor's code ([#49](https://github.com/push-based/vite-plugin-ngp/pull/49))
+
+### ❤️ Thank You
+
+- Christopher Holder @ChristopherPHolder
+- ChristopherPHolder
+- GreedyAI
+
 ## 0.4.0 (2026-11-18)
 
 ### 📦 Build

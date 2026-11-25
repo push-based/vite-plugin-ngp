@@ -3,7 +3,7 @@
   "nx": {
     "name": "vite-plugin-ngp"
   },
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Vite plugin that compiles Angular with ngp, Angular's hybrid Rust/TypeScript preprocessor",
   "license": "MIT",
   "author": "PushBased",
