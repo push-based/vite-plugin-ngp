@@ -85,3 +85,17 @@ test('runtimeScopes: a standalone component outside a spec keeps its scope error
   assert.equal(withIt.ok, false, 'a typo in a standalone component still fails');
   assert.match(withIt.output, /NG8001: 'app-lable' is not a known element/);
 });
+
+test('jitCompat: a component with a @defer dependency has its metadata at once, and @defer still works', async () => {
+  const without = await runSpec('defer-off', 'src/dashboard.spec.ts', {});
+  assert.equal(without.ok, false);
+  assert.match(without.output, /Component 'Dashboard' has unresolved metadata/);
+  // Stepping through the @defer block works either way.
+  assert.match(without.output, /2 failed \| 1 passed/);
+
+  const withIt = await runSpec('defer-on', 'src/dashboard.spec.ts', {jitCompat: true});
+  assert.equal(withIt.ok, true, withIt.output);
+  assert.match(withIt.output, /3 passed/);
+  // The HMR loader ngp emits in this mode is gone: nothing tried to import /@ng/component.
+  assert.doesNotMatch(withIt.output, /@ng\/component|Unhandled/);
+});

@@ -4,6 +4,7 @@ import {readConfiguration} from '@angular/compiler-cli';
 import {hmrCandidates} from './hmr-candidates.js';
 import {FileUpdateType, loadNgp, type Analyzer, type ClassMetadata, type Engine, type HybridCompiler, type NgpDiagnostic} from './ngp-api.js';
 import {stableJson, toolchainId, type OutputCache} from './output-cache.js';
+import {blankHmrInitializers} from './static-defer.js';
 
 export interface CompilerOptions {
   toolchainDir: string;
@@ -26,6 +27,11 @@ export interface CompilerOptions {
    * `dropRuntimeScoped`. Changes what's reported, not the output.
    */
   runtimeScopes?: boolean;
+  /**
+   * Keep `@defer` dependencies as static imports, so class metadata stays synchronous
+   * (`test.jitCompat`). Compiles with ngp's HMR mode, without its HMR code: see static-defer.ts.
+   */
+  staticDefer?: boolean;
 }
 
 /** One component's HMR update: Angular's id for it, and the update module as TypeScript. */
@@ -87,14 +93,17 @@ export class NgpCompiler {
     /** What every cached output of this compiler depends on, besides the module. See cacheKey. */
     private readonly cacheIdentity: string,
     private readonly runtimeScopes: boolean,
+    private readonly staticDefer: boolean,
   ) {}
 
   static async create(options: CompilerOptions): Promise<NgpCompiler> {
     const {api, binding} = await loadNgp(options.toolchainDir, options.engine);
+    // ngp keeps `@defer` dependencies static only in HMR mode.
+    const enableHmr = options.enableHmr || options.staticDefer === true;
     const ngOptions = readConfiguration(options.tsconfig).options;
     const analyzer = await api.createAnalyzer(options.analyzerTsconfig, {
       optimize: true,
-      enableHmr: options.enableHmr,
+      enableHmr,
       backend: options.engine,
       ...binding,
     });
@@ -105,7 +114,7 @@ export class NgpCompiler {
       tcbConfig: api.buildTypeCheckingConfig(ngOptions, false),
       rootDir,
       supportJitMode: ngOptions['supportJitMode'] !== false,
-      enableHmr: options.enableHmr,
+      enableHmr,
       // Stylesheets go through Vite's CSS pipeline instead: see styles.ts.
       externalRuntimeStyles: true,
       // The i18n options ngc reads from angularCompilerOptions. They change the message ids in the
@@ -131,6 +140,7 @@ export class NgpCompiler {
       ? JSON.stringify({
           toolchain: await toolchainId(options.toolchainDir),
           engine: options.engine,
+          staticDefer: options.staticDefer === true,
           hybrid: {...hybridOptions, tcbConfig: undefined},
           ngOptions: stableJson(ngOptions),
         })
@@ -144,6 +154,7 @@ export class NgpCompiler {
       options.cache ?? null,
       cacheIdentity,
       options.runtimeScopes ?? false,
+      options.staticDefer === true,
     );
     // The analyzer follows imports on disk, so it would read the replaced file. Giving it the
     // replacement's content under the replaced file's path makes every file that imports it, and
@@ -171,7 +182,7 @@ export class NgpCompiler {
     const processed = await this.hybrid.processFile(file, code, metadata ?? undefined);
     const result = processed.magicString.hasChanged()
       ? {
-          code: processed.magicString.toString(),
+          code: this.staticDefer ? blankHmrInitializers(processed.magicString.toString(), file) : processed.magicString.toString(),
           map: processed.magicString.generateMap({hires: 'boundary', source: file, includeContent: true}).toString(),
           diagnostics: [...(processed.diagnostics ?? []), ...(await this.missingTemplates(file, metadata))],
         }

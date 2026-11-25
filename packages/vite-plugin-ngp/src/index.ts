@@ -135,8 +135,10 @@ export interface TestOptions {
   /**
    * Keep what `TestBed.overrideComponent`, `overrideModule` and `overrideTemplate` need to
    * recompile a class with JIT: libraries are linked with `linkerJitMode`, and `ngJitMode` is
-   * `true`, so NgModules keep their scopes (`ɵɵsetNgModuleScope`). Without it, an overridden
-   * component sees nothing from the NgModules it imports.
+   * `true`, so NgModules keep their scopes (`ɵɵsetNgModuleScope`). And `@defer` dependencies stay
+   * static imports, so class metadata is set synchronously, as under JIT: specs that never call
+   * `compileComponents()`, and ng-mocks' `MockComponent()`, work with such components. Without it,
+   * an overridden component sees nothing from the NgModules it imports.
    */
   jitCompat?: boolean;
   /**
@@ -428,6 +430,7 @@ function compilerPlugin(
         fileReplacements: replacements.byFile,
         cache: cache ?? undefined,
         runtimeScopes: testing && options.test?.runtimeScopes === true,
+        staticDefer: jitCompat,
       });
     })();
     compilers.set(consumer, compiler);
