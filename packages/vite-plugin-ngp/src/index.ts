@@ -1004,6 +1004,8 @@ function linkerRolldownPlugin(): RolldownPlugin {
 
 /** Runs Angular's linker on library code, both where Vite pre-bundles it and where it doesn't. */
 function linkerPlugin(api: CompilerApi): Plugin {
+  /** Where Vite writes its pre-bundles: `<cacheDir>/deps`, `deps_ssr`, and so on, one per environment. */
+  let preBundles: string | undefined;
   return {
     name: 'vite-plugin-ngp:linker',
     config() {
@@ -1012,10 +1014,19 @@ function linkerPlugin(api: CompilerApi): Plugin {
       // `configEnvironment`.
       return {optimizeDeps: {rolldownOptions: {plugins: [linkerRolldownPlugin()]}}};
     },
+    configResolved(config) {
+      preBundles = `${config.cacheDir}/deps`;
+    },
     // Production builds, and dependencies Vite serves without pre-bundling.
     transform: {
       filter: LINKER_FILTER,
       handler(code, id) {
+        // A pre-bundle was linked when it was built. The filter leaves out the default `cacheDir`;
+        // this covers any other. @angular/core's pre-bundle carries the marker, as the code that
+        // defines `ɵɵngDeclare*`, so it would be parsed whole on every start to link nothing.
+        if (preBundles && id.startsWith(preBundles)) {
+          return null;
+        }
         const cache = api.cache();
         // Linking is a function of the file and the installed Angular, which the cache's scope covers.
         return (cache ? cache.reuse(['linker', cleanId(id), code], () => link(code, id)) : link(code, id)) as never;

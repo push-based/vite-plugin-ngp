@@ -43,3 +43,28 @@ test('a server environment the plugin does not own pre-bundles Angular libraries
     await server.close();
   }
 });
+
+test('a pre-bundle is not linked again, wherever cacheDir puts it', async () => {
+  const root = await copyFixture('ng-build-app', 'server-environments-cache-dir');
+  // Outside node_modules/.vite, which the linker's filter leaves out by name.
+  const cacheDir = path.join(root, '.vite');
+  const server = await createServer({root, cacheDir, configFile: false, logLevel: 'silent', server: {middlewareMode: true, ws: false}, plugins: ngp({toolchain})});
+  try {
+    const linker = linkerOf(server.config.plugins);
+    const {include, exclude} = linker.transform.filter.id;
+    // What a library ships. In a pre-bundle it could only be there linked, so a call left as it
+    // is shows the linker never ran.
+    const partial =
+      "import * as i0 from '@angular/core';\nexport class Store {}\n" +
+      "Store.ɵprov = i0.ɵɵngDeclareInjectable({minVersion: '12.0.0', version: '22.3.0', ngImport: i0, type: Store, providedIn: 'root'});\n";
+    const preBundle = `${server.config.cacheDir}/deps/ui-kit.js?v=6288c9a3`;
+    assert.ok(include.test(preBundle) && !exclude.test(preBundle), 'the filter alone lets this pre-bundle through');
+    assert.equal(linker.transform.handler.call({}, partial, preBundle), null);
+
+    const unbundled = linker.transform.handler.call({}, partial, `${root}/node_modules/ui-kit/index.js?v=6288c9a3`);
+    assert.match(unbundled.code, /ɵɵdefineInjectable/);
+    assert.doesNotMatch(unbundled.code, /ɵɵngDeclare/);
+  } finally {
+    await server.close();
+  }
+});
