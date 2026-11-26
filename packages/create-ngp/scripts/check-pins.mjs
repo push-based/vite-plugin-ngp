@@ -1,5 +1,6 @@
 // Checks that every version a template pins is the one the repo builds and tests the plugin with:
-// Angular from toolchain/versions.env, the rest from the playground. The plugin's own version isn't
+// Angular from toolchain/versions.env, the rest from the playground, and the server packages of
+// app-ssr from the plugin's devDependencies, which its @angular/ssr tests run with. The plugin's own version isn't
 // in the templates; create-ngp writes its own version there, and Nx releases both packages together.
 // `node scripts/check-pins.mjs` exits 1 and lists the differences; prepack runs it.
 import {readFileSync, readdirSync} from 'node:fs';
@@ -18,7 +19,14 @@ export function expectedPins() {
   }
   const playground = JSON.parse(readFileSync(join(root, 'playground', 'package.json'), 'utf8'));
   const all = {...playground.dependencies, ...playground.devDependencies};
-  return {angular, others: Object.fromEntries(['rxjs', 'tslib', 'typescript', 'vite', 'vitest'].map((name) => [name, all[name]]))};
+  const plugin = JSON.parse(readFileSync(join(root, 'packages', 'vite-plugin-ngp', 'package.json'), 'utf8')).devDependencies;
+  return {
+    angular,
+    others: {
+      ...Object.fromEntries(['rxjs', 'tslib', 'typescript', 'vite', 'vitest'].map((name) => [name, all[name]])),
+      ...Object.fromEntries(['express', '@types/express', '@types/node'].map((name) => [name, plugin[name]])),
+    },
+  };
 }
 
 /** Every pin in every template that differs from the repo's, as readable lines. */

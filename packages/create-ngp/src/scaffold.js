@@ -8,7 +8,7 @@ export const TEMPLATES_DIR = join(import.meta.dirname, '..', 'templates');
 /** The templates, in the order the prompt lists them. `extends` is copied first, then the template over it. */
 export const TEMPLATES = [
   {name: 'app', label: 'App', hint: 'rendered in the browser, with routing and a Vitest spec'},
-  {name: 'app-ssr', label: 'App with server rendering', hint: 'app, plus rendering on the server and hydration', extends: 'app'},
+  {name: 'app-ssr', label: 'App with server rendering', hint: 'app, plus @angular/ssr: an Express server, prerendering and hydration', extends: 'app'},
 ];
 
 export const DEFAULT_DIR = 'ngp-app';
