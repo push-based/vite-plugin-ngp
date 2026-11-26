@@ -132,7 +132,7 @@ The pass trusts what the CLI trusts: that no top-level code in Angular's package
 
 Building the 5,000-component app spends most of its time transforming modules: 14.6 of 16.6 seconds without type-checking, and most of that is ngp's code generation, which is Angular's template compiler in TypeScript ([Performance](performance#production-builds)). Every build paid it in full, and in an Nx workspace every app build paid it again for every library file.
 
-Since 9 November 2026, `vite build` and Vitest keep what they compiled, under Vite's `cacheDir`, at `node_modules/.vite/vite-plugin-ngp/cache` by default. Three things are kept, one entry per module, each named by a hash of what its output depends on:
+Since 9 November 2026, `vite build` and Vitest keep what they compiled, under Vite's `cacheDir`, at `node_modules/.vite/vite-plugin-ngp/cache` by default, or in the directory `cache: {dir}` names. Three things are kept, one entry per module, each named by a hash of what its output depends on:
 
 - **ngp's output** for one of your modules. The hash covers the ngp build (every `.js` file of its preprocessor, so a patched or rebuilt one misses), the plugin's own code, the Angular compiler's version, the project's root and every option that reaches ngp; the module's path and its code as Vite hands it over; the content of its external templates and stylesheets; and the analyzer's metadata for the file. That metadata carries the selector, inputs, outputs, standalone flag and host directives of every component, directive and pipe the module's templates use, and the value of every constant its decorators read. So adding an input to a child component recompiles its parents, and editing a comment in the child's file doesn't.
 - **The linker's output** for a library module in `node_modules`, by the file and its content.
@@ -156,3 +156,27 @@ On the 5,000-component app a warm build after one template edit took as long as 
 To see what a build reused, set `DEBUG=vite-plugin-ngp`: each module is logged as `compiled`, `reused` or `unchanged`, and the build ends with the hit and miss count. `cache: false` turns it off ([Configuration](configuration#when-to-change-them)).
 
 Where it's weak: a hash with a missing input would serve a wrong module with no error. The repo has a test for each kind of input, from a template edit to a new input on a used component, and the metadata the key hashes is the analyzer's whole result for the file, with only its run-specific ids and spans removed. If a build ever comes out stale, `cache: false` is the check, and the key is the bug.
+
+### Sharing one directory between projects
+
+Under Vitest, a project's `cacheDir` is `vitest/<hash of the project's name>` inside Vite's `cacheDir`, which is `node_modules/.vite` under the project's own root unless you set it. So every project has its own output cache. In a workspace with hundreds of Vitest projects, each one links `@angular/common` and every other Angular library for itself. Vitest's own module cache doesn't help either: its key holds the project's root and the content of its config files, so one project never reads what another transformed.
+
+Since 26 November 2026, `cache: {dir: 'path'}` names the output cache's directory, absolute or relative to Vite's root ([Configuration](configuration#when-to-change-them)). Point every project at the same one, and when Vitest asks for a library a project hasn't seen, the plugin reads what another project linked instead of linking it again.
+
+Only the directory changes. Every entry keeps the key it had:
+
+- **Library code is shared.** The linker's key is the file's path, its content and whether `test.jitCompat` is on, under the plugin's own code and the installed Angular versions. Nothing in it names a project, so two projects that resolve the same file read the same entry. The same goes for the build optimizer's output for a library module.
+- **Your compiled modules are not.** Their key holds the folder of the tsconfig they compile with and that tsconfig's resolved options, its own path among them, and their output names files by absolute path. Two projects with a tsconfig each never share one, in one directory or in two. Two projects pointed at the very same tsconfig file do, as two builds of one project always have. A test in the repo runs two projects with different roots on one directory, as builds and as Vitest runs: the second reads the first one's libraries, and none of its compiled modules.
+
+Many projects can write at once. Each entry is written to a temporary file and renamed into place, and the temporary name is unique to the process and to the cache, so two plugins in one Vitest process can't pick the same one.
+
+What it saves, on an M4 Max on 26 November 2026: three specs of the plugin's own Vitest fixture, which link 16 library modules into 346 kB of code, five runs of each case, with Vitest's module cache empty for the project.
+
+| A project Vitest has never run | Run time |
+|---|---:|
+| Empty directory, so it links everything | 1.20–1.29 s |
+| Directory another project filled | 1.09–1.15 s |
+| For comparison: the same project again, Vitest's own cache warm | 0.48–0.49 s |
+| The same project with only Vitest's cache emptied, 4 runs | 1.06–1.10 s |
+
+Where it's weak: that's about 0.1 s of the roughly 0.75 s a project's first run costs over its second. Linking isn't most of it. The last row shows where the rest goes: with everything the plugin keeps still in place, the project's own compiled modules too, emptying Vitest's cache alone costs about 0.6 s. That's Vitest's own work on every inlined library, `@angular/core` included, which never needs linking, and Vitest keeps the result per project. The plugin can't share that part. Compiled modules stay per project until their key stops naming the project, which is [issue #61](https://github.com/push-based/vite-plugin-ngp/issues/61). The directory only works within one checkout on one machine, since keys hold absolute paths. Nothing prunes it, and now every project adds to it. Its entries are code your builds and tests run, so whoever can write to the directory can change that code: keep it where only your own builds write, as you do `node_modules`. And when many projects start cold at once, each links the same libraries before any has written them: wasted work, not wrong output.
