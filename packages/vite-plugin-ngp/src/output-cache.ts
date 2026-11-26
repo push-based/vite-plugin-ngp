@@ -1,4 +1,4 @@
-import {createHash} from 'node:crypto';
+import {createHash, randomBytes} from 'node:crypto';
 import {readdirSync, readFileSync} from 'node:fs';
 import * as fs from 'node:fs/promises';
 import {createRequire} from 'node:module';
@@ -13,13 +13,20 @@ import {fileURLToPath} from 'node:url';
  * page needs, and most of its cold start is Vite's own dependency pre-bundling, which Vite caches.
  *
  * Every write goes to a temporary name and is renamed into place, because the client and server
- * environments of one build transform modules at the same time, and two builds may share the
- * directory. A read or write that fails is a miss, never an error: the cache only saves time.
+ * environments of one build transform modules at the same time, and with the `cache.dir` option
+ * every project of a workspace may share the directory. A read or write that fails is a miss,
+ * never an error: the cache only saves time.
  */
 export class OutputCache {
   hits = 0;
   misses = 0;
   private counter = 0;
+  /**
+   * Part of every temporary name, with the process id and the counter. Two caches in one process
+   * count from zero each, and two machines on one network directory can share a process id, so
+   * without it two writers of one entry could pick the same temporary file.
+   */
+  private readonly writer = randomBytes(6).toString('hex');
 
   /**
    * `scope` is what every entry depends on: the plugin's code and the versions of the Angular
@@ -52,7 +59,7 @@ export class OutputCache {
 
   async put(key: string, value: unknown): Promise<void> {
     const file = this.file(key);
-    const tmp = `${file}.${process.pid}.${++this.counter}.tmp`;
+    const tmp = `${file}.${process.pid}.${this.writer}.${++this.counter}.tmp`;
     try {
       await fs.mkdir(path.dirname(file), {recursive: true});
       await fs.writeFile(tmp, JSON.stringify(value));
@@ -127,10 +134,16 @@ function pluginId(): string {
  * What every cached output depends on: this plugin's code, and the versions of `@angular/compiler`
  * (ngp generates code with it) and `@angular/compiler-cli` (the linker). Each version is resolved
  * from the app, then from the plugin.
+ *
+ * `linker` is the `@angular/compiler-cli` this plugin itself resolves, which is the one linker.ts
+ * imports and so the one that links. In one install it's the app's. Projects that share a
+ * directory (`cache.dir`) may come from installs where it isn't, and a library entry must never
+ * be read by a project whose linker is another version.
  */
 export function cacheScope(root: string): string {
-  const requires = [createRequire(path.join(root, 'package.json')), createRequire(import.meta.url)];
-  const version = (name: string): string => {
+  const fromApp = createRequire(path.join(root, 'package.json'));
+  const fromPlugin = createRequire(import.meta.url);
+  const version = (name: string, requires: NodeJS.Require[]): string => {
     for (const require of requires) {
       try {
         return (require(`${name}/package.json`) as {version: string}).version;
@@ -142,7 +155,8 @@ export function cacheScope(root: string): string {
   };
   return JSON.stringify({
     plugin: pluginId(),
-    compiler: version('@angular/compiler'),
-    compilerCli: version('@angular/compiler-cli'),
+    compiler: version('@angular/compiler', [fromApp, fromPlugin]),
+    compilerCli: version('@angular/compiler-cli', [fromApp, fromPlugin]),
+    linker: version('@angular/compiler-cli', [fromPlugin]),
   });
 }

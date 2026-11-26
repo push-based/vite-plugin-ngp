@@ -14,6 +14,10 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 - `ssr: true` now runs `@angular/ssr` when your app depends on it, with the files `ng new --ssr` writes: an Express `server.ts` on `AngularNodeAppEngine`, `main.server.ts` exporting the bootstrap function, and server routes. `Prerender`, `Server` and `Client` render modes, status codes and redirects work in the dev server and from the built `dist/server/server.js`, and `vite build` prerenders, calling `getPrerenderParams`. Before, server rendering meant a `render(url, document)` function and a server you wrote, with no status codes; apps without `@angular/ssr` still work that way. New `ssr.server` and `ssr.allowedHosts` options. `@angular/ssr` with `i18n` isn't supported yet. [Server rendering](server-rendering#with-angular-ssr), [Configuration](configuration)
 - The `app-ssr` template of `create-ngp` now scaffolds that setup in place of its `server.mjs`: `npm start` runs `node dist/server/server.js`, and every route is prerendered to start with. [Using Vite+](vite-plus#the-templates)
 
+### Output cache
+
+- `cache: {dir: 'path'}` names the directory the output cache lives in, so every project of a workspace can use the same one. Under Vitest each project had its own, and linked every Angular library for itself. With one directory, a library one project linked is read by the others. Your own compiled modules stay per project, as before, and no cache key changed. It's a small saving on its own: about 0.1 s for a project Vitest has never run, in the case measured. `cache: true` and `cache: false` work as they did. [Configuration](configuration#when-to-change-them), [How it works](how-it-works#sharing-one-directory-between-projects), [Nx](nx#one-output-cache-for-the-workspace)
+
 ## 25 November 2026
 
 ### Angular

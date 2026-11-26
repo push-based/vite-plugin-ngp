@@ -131,11 +131,17 @@ export interface NgpPluginOptions {
    */
   i18n?: I18nOptions;
   /**
-   * Keep compiled output between runs, under Vite's `cacheDir`, so `vite build` and Vitest skip
-   * ngp's code generation, the linker and the build optimizer for every module whose inputs are
-   * unchanged. The dev server never uses it. Defaults to true.
+   * Keep compiled output between runs, so `vite build` and Vitest skip ngp's code generation, the
+   * linker and the build optimizer for every module whose inputs are unchanged. The dev server
+   * never uses it. Defaults to true, which keeps it in `vite-plugin-ngp/cache` under Vite's
+   * `cacheDir`, a different directory for every Vitest project.
+   *
+   * `{dir}` names the directory instead, absolute or relative to Vite's `root`. Give every
+   * project of a workspace the same one and each Angular library is linked once for all of them,
+   * not once per project. Only the directory changes: every entry keeps its key, so it's still
+   * read only where everything its output depends on is the same.
    */
-  cache?: boolean;
+  cache?: boolean | {dir?: string};
   /**
    * Test-only behaviour, for specs written for TestBed under JIT. Applies under Vitest only, and
    * is ignored in the dev server and in builds, so it can sit in a Vite config both share. Off by
@@ -338,6 +344,12 @@ function compilerPlugin(
   const engine = options.engine ?? 'native';
   if (engine !== 'native' && engine !== 'wasm') {
     throw new Error(`[vite-plugin-ngp] engine must be 'native' or 'wasm', not ${JSON.stringify(engine)}`);
+  }
+  const cacheDirOption = options.cache && typeof options.cache === 'object' ? options.cache.dir : undefined;
+  // An empty string would resolve to Vite's root. configResolved rejects every other spelling of
+  // that, once the root is known.
+  if (cacheDirOption !== undefined && (typeof cacheDirOption !== 'string' || cacheDirOption.trim() === '')) {
+    throw new Error(`[vite-plugin-ngp] cache.dir must be a path, not ${JSON.stringify(cacheDirOption)}`);
   }
   let checker: TypeChecker | null = null;
   let devCheck: ReturnType<typeof startDevTypeCheck> | null = null;
@@ -723,7 +735,16 @@ function compilerPlugin(
       // Builds and test runs reuse output from the last run. The dev server compiles what the
       // page asks for, and a restart is already fast, so it stays out (decision 66).
       if (options.cache !== false && (config.command === 'build' || testing)) {
-        cache = new OutputCache(path.join(config.cacheDir, 'vite-plugin-ngp/cache'), cacheScope(config.root));
+        // The `cache.dir` option, resolved from Vite's root like every other path the plugin
+        // takes, or else a folder in Vite's `cacheDir`.
+        const dir = cacheDirOption === undefined ? path.join(config.cacheDir, 'vite-plugin-ngp/cache') : path.resolve(config.root, cacheDirOption);
+        // Entries are 256 folders of JSON files. In the root, or in a folder the root is inside,
+        // such as the workspace root, they'd land among the sources.
+        const rootFromDir = path.relative(dir, path.resolve(config.root));
+        if (cacheDirOption !== undefined && !(rootFromDir.startsWith('..') || path.isAbsolute(rootFromDir))) {
+          throw new Error(`[vite-plugin-ngp] cache.dir is ${dir}, which holds Vite's root. Name a folder for the cache alone, such as node_modules/.cache/vite-plugin-ngp`);
+        }
+        cache = new OutputCache(dir, cacheScope(config.root));
       }
       // The default names the server entry too, so a custom `ssr.entry` gets its polyfills and
       // i18n prelude without the app having to restate `src/main.ts` in `entries`.

@@ -7,7 +7,10 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import {test} from 'node:test';
-import {OutputCache, stableJson} from '../dist/output-cache.js';
+import fsPromises from 'node:fs/promises';
+import {createRequire, syncBuiltinESMExports} from 'node:module';
+import {cacheScope, OutputCache, stableJson} from '../dist/output-cache.js';
+import {ngp} from '../dist/index.js';
 import {build, copyFixture, readOutput, toolchain} from './fixture.mjs';
 
 /** A statement Rolldown keeps, so a cached module that carries it shows in the bundle. */
@@ -31,6 +34,15 @@ test('a key changes with its scope and with any part', () => {
   assert.equal(a.key(['x', {y: 1}]), a.key(['x', {y: 1}]));
   assert.notEqual(a.key(['x', {y: 1}]), a.key(['x', {y: 2}]));
   assert.notEqual(a.key(['x']), b.key(['x']));
+});
+
+test('the scope names the compiler-cli that links, the one the plugin resolves, whatever the root', () => {
+  const linker = createRequire(new URL('../dist/linker.js', import.meta.url)).resolve('@angular/compiler-cli/package.json');
+  const {version} = createRequire(import.meta.url)(linker);
+  // A root with no Angular in reach still gets the linker's version, not 'unknown'.
+  for (const root of [process.cwd(), '/']) {
+    assert.equal(JSON.parse(cacheScope(root)).linker, version);
+  }
 });
 
 test('builds read the cache, and miss when a template, a used input or the code changes', async () => {
@@ -113,6 +125,68 @@ test('cache: false writes nothing', async () => {
   const root = await copyFixture('ng-build-app', 'no-cache');
   await build(root, {cache: false});
   await assert.rejects(fs.access(path.join(root, '.vite/vite-plugin-ngp/cache')));
+});
+
+test('cache.dir names the directory, from Vite\'s root, and a second build reads it', async () => {
+  const root = await copyFixture('ng-build-app', 'cache-dir');
+  const cacheDir = path.join(root, 'kept/ngp');
+  const bundle = async () => (await readOutput(path.join(root, 'dist'))).map((f) => f.content).join('\n');
+
+  await build(root, {cache: {dir: 'kept/ngp'}});
+  assert.ok((await entries(cacheDir)).length > 0, 'the build wrote its entries to cache.dir');
+  await assert.rejects(fs.access(path.join(root, '.vite/vite-plugin-ngp/cache')), 'and none under cacheDir');
+
+  await markEntry(cacheDir, 'app-root');
+  await build(root, {cache: {dir: 'kept/ngp'}});
+  assert.match(await bundle(), /__ngpCacheMarker/, "App's compiled code came from cache.dir");
+
+  // The same directory by its absolute path, and an empty options object as `true`.
+  await build(root, {cache: {dir: cacheDir}});
+  assert.match(await bundle(), /__ngpCacheMarker/);
+  await build(root, {cache: {}});
+  assert.doesNotMatch(await bundle(), /__ngpCacheMarker/, 'without dir, the default directory');
+  assert.ok((await entries(path.join(root, '.vite/vite-plugin-ngp/cache'))).length > 0);
+});
+
+test('cache.dir has to be a path, and not the root or a folder the root is in', async () => {
+  for (const dir of ['', '  ', 3, null]) {
+    assert.throws(() => ngp({toolchain, cache: {dir}}), /cache\.dir must be a path/, JSON.stringify(dir));
+  }
+  // Entries there would land among the sources: the workspace root passed as the directory, say.
+  const root = await copyFixture('ng-build-app', 'cache-dir-root');
+  for (const dir of ['.', '..', root, path.dirname(root)]) {
+    await assert.rejects(build(root, {cache: {dir}}), /cache\.dir is .*, which holds Vite's root/, dir);
+  }
+  assert.deepEqual((await fs.readdir(root)).sort(), (await fs.readdir(path.join(root, '../../fixtures/ng-build-app'))).sort(), 'nothing was written to the root');
+});
+
+test('two caches on one directory write the same entries at once, and every one reads back whole', async () => {
+  const dir = path.join(await copyFixture('ng-build-app', 'cache-writers'), 'kept');
+  const caches = [new OutputCache(dir, 'scope'), new OutputCache(dir, 'scope')];
+  const value = {result: {code: 'x'.repeat(200_000)}};
+  const keys = Array.from({length: 40}, (_, i) => caches[0].key(['entry', i]));
+  // Both count their writes from zero, as two plugins in one Vitest process do. Without an id
+  // per cache they'd write each entry through one temporary file, and still pass the checks
+  // below most of the time, so the names themselves are checked too.
+  const temporary = [];
+  const writeFile = fsPromises.writeFile;
+  fsPromises.writeFile = (file, ...rest) => {
+    temporary.push(String(file));
+    return writeFile(file, ...rest);
+  };
+  syncBuiltinESMExports();
+  try {
+    await Promise.all(caches.flatMap((cache) => keys.map((key) => cache.put(key, value))));
+  } finally {
+    fsPromises.writeFile = writeFile;
+    syncBuiltinESMExports();
+  }
+  assert.equal(temporary.length, 80);
+  assert.equal(new Set(temporary).size, 80, 'every write went to a temporary file of its own');
+  for (const key of keys) {
+    assert.deepEqual(await caches[1].get(key), value);
+  }
+  assert.deepEqual((await fs.readdir(dir, {recursive: true})).filter((f) => f.endsWith('.tmp')), [], 'no temporary file left behind');
 });
 
 /** Every entry under `dir`, with its path and parsed value. */

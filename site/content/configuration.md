@@ -48,7 +48,7 @@ export default defineConfig({
 | `fileReplacements` | `{replace: string; with: string}[]`<br>Default `[]` | angular.json's `fileReplacements`, relative to Vite's root. Every import of `replace` gets the content of `with`, in Vite and in ngp's analyzer, in dev and in builds. |
 | `budgets` | `Budget[]`<br>Default `[]` | angular.json's `budgets`: size limits checked after `vite build`, with the CLI's types and messages. An error budget fails the build. |
 | `polyfills` | `string[]`<br>Default `[]` | angular.json's `polyfills`: packages or files imported before your app. `zone.js` also makes the plugin rewrite `async`/`await` so zone.js can track it. |
-| `cache` | `boolean`<br>Default `true` | Keep compiled output between runs, under Vite's `cacheDir`. `vite build` and Vitest then skip ngp's code generation, the linker and the build optimizer for every module whose inputs are unchanged. The dev server never uses it. See [Reusing output between builds](how-it-works#reusing-output-between-builds). |
+| `cache` | `boolean \| {dir?: string}`<br>Default `true` | Keep compiled output between runs. `vite build` and Vitest then skip ngp's code generation, the linker and the build optimizer for every module whose inputs are unchanged. `true` keeps it under Vite's `cacheDir`, and `{dir: 'path'}` in a directory you name, which the projects of a workspace can share. The dev server never uses it. See [Reusing output between builds](how-it-works#reusing-output-between-builds). |
 | `test` | `TestOptions`<br>Default: every switch off | Switches for specs written for TestBed under JIT. They apply under Vitest only, so the option can sit in a Vite config your builds share. `jitCompat` makes specs see what JIT TestBed saw: NgModule scopes for `TestBed.override*`, and `@defer` dependencies as static imports, so class metadata is there without `compileComponents()`. `extendedDiagnostics: 'warning'` reports Angular's extended diagnostics as warnings in specs, whatever your tsconfig sets. `runtimeScopes` drops the template scope errors TestBed resolves at runtime, for non-standalone and spec-declared components only. See [Specs written for JIT](testing#specs-written-for-jit). |
 
 ## When to change them
@@ -63,7 +63,17 @@ export default defineConfig({
 
 **`ssr: {allowedHosts: [...]}`** lists the hosts a built `@angular/ssr` server renders for, replacing the default `['localhost']`. Set it to your production domains; any other `Host` gets a 400. `NG_ALLOWED_HOSTS` adds to it when the server starts.
 
-**`cache: false`** compiles every module on every build and test run, as the plugin did before 9 November 2026. Use it to rule the cache out when a build's output looks stale, and open an issue if that fixes it: a stale hit means the key is missing an input, which is a bug. Deleting `node_modules/.vite/vite-plugin-ngp/cache` has the same effect once. In CI, the cache only helps if the `cacheDir` is restored between runs, at the same path: the project's root is part of every key.
+**`cache: false`** compiles every module on every build and test run, as the plugin did before 9 November 2026. Use it to rule the cache out when a build's output looks stale, and open an issue if that fixes it: a stale hit means the key is missing an input, which is a bug. Deleting `node_modules/.vite/vite-plugin-ngp/cache` has the same effect once. In CI, the cache only helps if its directory is restored between runs, with the project at the same path: every key holds its module's absolute path.
+
+**`cache: {dir}`** keeps the output cache in a directory you name, absolute or relative to Vite's root. It's for a workspace with many Vitest projects. Vitest gives every project its own `cacheDir`, so by default each project links every Angular library for itself. With one directory for all of them, a library is linked once and the other projects read it. Build the path from the workspace root, because a relative one resolves from each project's own root and gives each its own directory again:
+
+```ts
+ngp({cache: {dir: path.join(workspaceRoot, 'node_modules/.cache/vite-plugin-ngp')}})
+```
+
+Give the cache a folder of its own. The plugin refuses a `dir` that is Vite's root or a folder the root is in, such as the workspace root itself, because the entries would land among your sources.
+
+Only library code is shared. Your own compiled modules stay per project even in one directory, because their key holds the tsconfig they compile with and its folder. Projects pointed at the very same tsconfig file do share them, which is safe: same file, same options, same output. And it saves less than it sounds: about a tenth of a second for a project Vitest has never run, in the one case measured. [Sharing one directory between projects](how-it-works#sharing-one-directory-between-projects) has the numbers and what the option leaves on the table.
 
 **`typeCheck: false`** skips the check in the dev server and in builds. Use it if you already run `tsc` or `ng build` in CI and the dev-server check is too slow on your app, or if your `cacheDir` is outside the project. Builds then succeed with type errors in them.
 

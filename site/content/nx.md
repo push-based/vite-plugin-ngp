@@ -111,6 +111,24 @@ Keep the `@nx/angular` targets under other names while you compare the two. The 
 
 Nx's test target runs Jest by default, and the plugin has nothing for Jest. [Testing with Vitest](testing) says how to run specs under Vitest. Under Vitest the plugin reads `tsconfig.spec.json` first, and in an Nx workspace that file lists Jest's types, so point `tsconfig` at one that doesn't. Ghostfolio's specs weren't run.
 
+## One output cache for the workspace
+
+A workspace that runs Vitest per project gets one output cache per project: Vitest gives each its own `cacheDir`, and the config above gives each app its own too. So every project links every Angular library it imports, once each. `cache: {dir}` names one directory for all of them:
+
+```ts title="apps/client/vite.config.mts"
+ngp({
+  cache: {dir: path.join(workspace, 'node_modules/.cache/vite-plugin-ngp')},
+}),
+```
+
+Use an absolute path from the workspace root, as here. A relative one resolves from Vite's root, which is each project's own folder. Put it in the preset your projects' configs share, if you have one.
+
+What's shared is library code: a library one project linked is read by the next. Each project still compiles your own libraries under `libs/` for itself, because a compiled module's key holds the tsconfig it compiles with and that tsconfig's folder, and every project in an Nx workspace has its own `tsconfig.spec.json`. [Issue #61](https://github.com/push-based/vite-plugin-ngp/issues/61) is the plan for that part.
+
+The directory isn't a task output. Every project's test target writes to it, so leave it out of `outputs` in `project.json`, and restore it in CI the way you restore `node_modules`. It works within one checkout on one machine: keys hold absolute paths, so it can't go through Nx's remote cache to a machine that checked the repo out somewhere else.
+
+This wasn't run in an Nx workspace. The repo's test uses two plain Vite roots that share a directory. [Sharing one directory between projects](how-it-works#sharing-one-directory-between-projects) has what it measured, which is a small saving: about 0.1 s per project that Vitest hasn't run before.
+
 ## What Ghostfolio needed
 
 The whole list, from `project.json` to the bench's config:
