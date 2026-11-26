@@ -1,3 +1,18 @@
+## 0.4.2 (2026-11-26)
+
+### 🚀 Features
+
+- run @angular/ssr under ssr: true, and scaffold app-ssr like ng new --ssr ([#60](https://github.com/push-based/vite-plugin-ngp/pull/60), [#59](https://github.com/push-based/vite-plugin-ngp/issues/59))
+- **vite-plugin-ngp:** accept every Angular 22.3 release from rc.0 ([#57](https://github.com/push-based/vite-plugin-ngp/issues/57))
+- **vite-plugin-ngp:** add a cache.dir option for one output cache per workspace ([#62](https://github.com/push-based/vite-plugin-ngp/pull/62), [#34](https://github.com/push-based/vite-plugin-ngp/issues/34))
+- **vite-plugin-ngp:** add a workspaceRoot option for one compile per module in a workspace ([#63](https://github.com/push-based/vite-plugin-ngp/pull/63))
+- **vite-plugin-ngp:** add test.externalLibraries, linked by a Node module hook ([#65](https://github.com/push-based/vite-plugin-ngp/pull/65), [#64](https://github.com/push-based/vite-plugin-ngp/issues/64))
+
+### ❤️ Thank You
+
+- Christopher Holder @ChristopherPHolder
+- ChristopherPHolder
+
 ## 0.4.1 (2026-11-25)
 
 ### 🚀 Features
