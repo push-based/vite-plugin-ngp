@@ -29,6 +29,8 @@ import {writeEntryTsconfig} from './entry-tsconfig.js';
 import {i18nPlugin, type I18nOptions} from './i18n.js';
 import {EXTENDED_DIAGNOSTIC_CODES} from './extended-diagnostics.js';
 import {link, LINKER_MARKER} from './linker.js';
+import {linkerKey, withoutSourceMapComment} from './linker-filter.js';
+import type {LinkHookOptions} from './link-hook.js';
 import {isSideEffectFree, optimize, OPTIMIZER_CANDIDATE} from './optimizer.js';
 import {resolveToolchain, type Engine, type NgpDiagnostic} from './ngp-api.js';
 import {cacheScope, OutputCache} from './output-cache.js';
@@ -187,6 +189,14 @@ export interface TestOptions {
    */
   jitCompat?: boolean;
   /**
+   * Leave Angular libraries to Node, and link each one as Node loads it, from the output cache.
+   * By default the plugin has Vitest inline them, and Vitest then transforms every library once
+   * per project, which no cache of the plugin's can serve. For a workspace with many Vitest
+   * projects. `vi.mock` then reaches a library only where your own code imports it, as for any
+   * external module. Needs pool `forks` or `threads`. Browser mode ignores it.
+   */
+  externalLibraries?: boolean;
+  /**
    * Report Angular's extended diagnostics (NG81xx, NG8011 and NG8021) as warnings in specs, whatever
    * category `angularCompilerOptions.extendedDiagnostics` gives them. A check the tsconfig
    * suppresses stays suppressed. Builds and the dev server still report them as configured.
@@ -234,6 +244,7 @@ type RolldownPlugin = Rolldown.Plugin;
  */
 interface VitestPluginContext {
   vitest: {watcher: {onFileChange(file: string): void}};
+  project: {config: {setupFiles: string[]; pool?: string; browser?: {enabled?: boolean}}};
   /** Called only when Vitest's fsModuleCache is on. `false` keeps a module out of the cache. */
   defineCacheKeyGenerator(generator: (context: {id: string}) => string | false | undefined): void;
 }
@@ -328,6 +339,8 @@ function compilerPlugin(
   const testing = isVitest();
   /** `test.jitCompat`, which only applies under Vitest. */
   const jitCompat = testing && options.test?.jitCompat === true;
+  /** `test.externalLibraries`: Node loads Angular libraries, and a hook links them on the way in. */
+  const externalLibraries = testing && options.test?.externalLibraries === true;
   if (options.test?.extendedDiagnostics !== undefined && options.test.extendedDiagnostics !== 'warning') {
     throw new Error(`[vite-plugin-ngp] test.extendedDiagnostics must be 'warning', not ${JSON.stringify(options.test.extendedDiagnostics)}`);
   }
@@ -687,6 +700,13 @@ function compilerPlugin(
         }
       }
       if (testing) {
+        // `test.jitCompat` keeps NgModule scopes, which TestBed's JIT overrides read.
+        const define = {ngJitMode: String(jitCompat), ngHmrMode: 'false'};
+        // With `test.externalLibraries` the libraries stay with Node, linked by a hook: see
+        // link-hook.ts.
+        if (externalLibraries) {
+          return {define};
+        }
         // Vitest leaves node_modules to Node, which would load Angular libraries unlinked, and
         // they'd need the JIT compiler. Inlining them sends them through the linker, and keeps
         // one copy of @angular/core. Tests use devDependencies too.
@@ -694,8 +714,7 @@ function compilerPlugin(
           /[\\/]node_modules[\\/]@angular[\\/]/,
           ...findAngularLibraries(root, {devDependencies: true}).map(packagePathPattern),
         ];
-        // `test.jitCompat` keeps NgModule scopes, which TestBed's JIT overrides read.
-        return {define: {ngJitMode: String(jitCompat), ngHmrMode: 'false'}, test: {server: {deps: {inline}}}} as UserConfig;
+        return {define, test: {server: {deps: {inline}}}} as UserConfig;
       }
       return {
         define: {
@@ -726,7 +745,8 @@ function compilerPlugin(
       const noExternal = [/^@angular\//, ...findAngularLibraries(root).map(packagePattern), ...angularSsrDependencies.map(packagePattern)];
       return {
         define: {ngServerMode: 'true', ngHmrMode: 'false'},
-        resolve: {noExternal},
+        // Vitest reads `noExternal` as a list to inline, which `test.externalLibraries` turns off.
+        ...(externalLibraries ? {} : {resolve: {noExternal}}),
         // In the dev server, pre-bundle those libraries once, linked, into the cache directory,
         // instead of linking and transforming them again on every start. A server environment the
         // plugin doesn't own, like a Cloudflare Worker's, may still pre-bundle them with its own
@@ -789,6 +809,26 @@ function compilerPlugin(
       // covers the config file but not `define` or how a library was linked, so `test.jitCompat`
       // adds to it: a run with it never reads a module linked or defined without it.
       context.defineCacheKeyGenerator(({id}) => (isAppModule(id) ? false : jitCompat ? 'vite-plugin-ngp:jit-compat' : undefined));
+      if (!externalLibraries) {
+        return;
+      }
+      const project = context.project.config;
+      // Browser mode pre-bundles the libraries, linked, as the dev server does.
+      if (project.browser?.enabled) {
+        return;
+      }
+      if (project.pool?.startsWith('vm')) {
+        throw new Error(`[vite-plugin-ngp] test.externalLibraries needs pool 'forks' or 'threads', not '${project.pool}': a vm pool loads external modules itself, past the hook that links them`);
+      }
+      // A setup file ahead of every other, so the hook is in place before one of them imports
+      // Angular. It carries what the hook needs: the worker has no other way to ask.
+      const hook: LinkHookOptions = {dir: cache?.dir ?? null, scope: cacheScope(config.root), jit: jitCompat};
+      const setup = path.join(config.cacheDir, 'vite-plugin-ngp/link-libraries.mjs');
+      fs.mkdirSync(path.dirname(setup), {recursive: true});
+      fs.writeFileSync(setup, `import {register} from ${JSON.stringify(new URL('./link-hook.js', import.meta.url).href)};\n\nregister(${JSON.stringify(hook)});\n`);
+      if (!project.setupFiles.includes(setup)) {
+        project.setupFiles.unshift(setup);
+      }
     },
 
     configureServer(server) {
@@ -1176,9 +1216,10 @@ function linkerPlugin(api: CompilerApi, jit: boolean): Plugin {
         }
         const cache = api.cache();
         // Linking is a function of the file, the installed Angular, which the cache's scope covers,
-        // and JIT mode. Without JIT the key is the one it always was, so existing entries still hit.
-        const parts = jit ? ['linker', cleanId(id), code, 'jit'] : ['linker', cleanId(id), code];
-        return (cache ? cache.reuse(parts, () => link(code, id, jit)) : link(code, id, jit)) as never;
+        // and JIT mode. The text and the key are the ones the hook that links libraries as Node
+        // loads them uses (link-hook.ts), so a library linked one way is found the other.
+        const input = withoutSourceMapComment(code);
+        return (cache ? cache.reuse(linkerKey(cleanId(id), input, jit), () => link(input, id, jit)) : link(input, id, jit)) as never;
       },
     },
   };

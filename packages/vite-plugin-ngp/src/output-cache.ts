@@ -1,5 +1,5 @@
 import {createHash, randomBytes} from 'node:crypto';
-import {readdirSync, readFileSync} from 'node:fs';
+import {mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import * as fs from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import * as path from 'node:path';
@@ -78,6 +78,32 @@ export class OutputCache {
     }
     const result = await compute();
     await this.put(key, {result});
+    return result;
+  }
+
+  /**
+   * `reuse` without a promise, for the hook that links libraries as Node loads them: a module
+   * hook has to answer at once. Same entries, same temporary names, same rule that a failed read
+   * or write is a miss.
+   */
+  reuseSync<T>(parts: readonly unknown[], compute: () => T): T {
+    const file = this.file(this.key(parts));
+    try {
+      const hit = JSON.parse(readFileSync(file, 'utf8')) as {result: T};
+      this.hits++;
+      return hit.result;
+    } catch {
+      this.misses++;
+    }
+    const result = compute();
+    const tmp = `${file}.${process.pid}.${this.writer}.${++this.counter}.tmp`;
+    try {
+      mkdirSync(path.dirname(file), {recursive: true});
+      writeFileSync(tmp, JSON.stringify({result}));
+      renameSync(tmp, file);
+    } catch {
+      rmSync(tmp, {force: true});
+    }
     return result;
   }
 

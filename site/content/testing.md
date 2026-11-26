@@ -126,7 +126,7 @@ vite-plugin-ngp compiled src/app/ui/icon.ts (2.5 ms)
 
 That's 3 of the playground's 29 modules. All three specs together load 10. The repo has a test that checks the list for two filtered runs.
 
-**Angular libraries get linked.** Vitest leaves `node_modules` to Node, which would load Angular's packages partially compiled, and they'd need the JIT compiler. The plugin adds every `@angular/*` package to `test.server.deps.inline`, plus every package in `dependencies` or `devDependencies` that depends on `@angular/core`. Vitest then sends them through Vite, where the linker runs. That also keeps one copy of `@angular/core`.
+**Angular libraries get linked.** Vitest leaves `node_modules` to Node, which would load Angular's packages partially compiled, and they'd need the JIT compiler. The plugin adds every `@angular/*` package to `test.server.deps.inline`, plus every package in `dependencies` or `devDependencies` that depends on `@angular/core`. Vitest then sends them through Vite, where the linker runs. That also keeps one copy of `@angular/core`. With [`test.externalLibraries`](testing#libraries-left-to-node) they stay with Node instead, and a hook links them as they load.
 
 **Libraries are cached, your code isn't.** Vitest 5 caches transformed modules on disk, keyed by each file's own content. That's wrong for a component: its compiled code also depends on its template, its styles and the components it imports, so a template edit would come back stale. The plugin keeps your app's `.ts` files out of that cache. Linked libraries stay in it, and linking is the slow part. On an M2 Max, measured on 6 November 2026, the playground's 11 tests take 1.5 s with an empty cache, and 0.58–0.61 s after that. Since 9 November 2026 your own modules have a cache of their own, the plugin's, whose key covers the template, the stylesheets and the used components' public shape ([Reusing output between builds](how-it-works#reusing-output-between-builds)). A run compiles only what changed since the last one; the analyzer still looks at every module a run imports.
 
@@ -160,6 +160,44 @@ You may not need the switch. Under Vitest the plugin reads `tsconfig.spec.json` 
 For these, ngp reports NG8001 to NG8004 (unknown element, property, reference and pipe), and NG8008 (missing required input) for a test host whose real template comes from an override. Each one fails the spec file. With `runtimeScopes`, the plugin drops NG8001 to NG8004 in those two kinds of component, and NG8008 in spec-declared ones. A spec file is one named `*.spec.ts` or `*.test.ts`, as in Vitest's default `include`.
 
 **Leave `runtimeScopes` off unless your specs need it.** These are real errors everywhere else, and the switch can hide a real one: an unknown element at runtime is only logged (NG0304) unless you set `errorOnUnknownElements` in `configureTestingModule`, so a misspelled selector in a non-standalone component can pass a spec. A standalone component outside a spec file keeps every error, switch or not. The switch changes what's reported, not the compiled code, so it doesn't touch the cache. If only a few specs need it, migrating their hosts to standalone components is the cleaner fix.
+
+## Libraries left to Node
+
+By default the plugin has Vitest inline every Angular library, so the linker sees them. Vitest then transforms each one for its module runner and keeps the result in its own cache, which is keyed on the project. In one project that's paid once. In a workspace with hundreds of Vitest projects, every project pays it for every library, `@angular/core` included, and nothing the plugin caches can stand in for it, because it happens after the plugin.
+
+`test.externalLibraries` takes the libraries out of Vitest's hands:
+
+```ts
+ngp({test: {externalLibraries: true}})
+```
+
+The libraries then stay external: Node loads them itself, as it loads `rxjs`. A setup file the plugin adds ahead of yours registers a Node module hook (`module.registerHooks`), and the hook swaps a partially compiled module's source for its linked code as Node loads it. The linked code comes from the plugin's [output cache](how-it-works#reusing-output-between-builds), under the same key the inlined path uses, so projects that share a `cache.dir` link each library once between them. Nothing in Vitest is patched or replaced: the hook is Node's own API, and the setup file goes in through Vitest's plugin hook.
+
+What it saves, on an M4 Max on 26 November 2026: three specs of the plugin's own Vitest fixture, five runs of each case, both columns in one session, all projects on one `cache.dir`.
+
+| | Inlined, the default | `externalLibraries` |
+|---|---:|---:|
+| The first project, on an empty directory | 1.11–1.16 s | 0.63–0.64 s |
+| A second project Vitest has never run | 1.05–1.13 s | 0.34–0.39 s |
+| That project again | 0.45–0.50 s | 0.30–0.34 s |
+
+The middle row is the workspace case: a project's first run costs what its tenth does, because Vitest has nothing of the libraries to rebuild. The playground's 33 specs pass with it in all three of its projects.
+
+What changes for your specs:
+
+- **`vi.mock` reaches a library only where your own code imports it.** That's how Vitest treats every external module. An import from one library to another isn't mocked. If a project's specs depend on that, leave the switch off for that project. Don't inline one library on its own: the others would still load their own copy of it from Node, and Angular breaks with two copies of a package.
+- **The globals are real globals.** For code that goes through Vite the plugin defines `ngJitMode` and `ngServerMode` at compile time. The libraries no longer go through Vite, so the setup file sets both on `globalThis` before Angular loads: `ngJitMode` to `false`, or `true` with `jitCompat`, and `ngServerMode` to `true` where there's no `document` yet, which is Vitest's `node` environment.
+- **`jitCompat` works with it.** The hook links for JIT then, as the transform does.
+- **Libraries are linked in every project.** Projects that share the root config's server, as `test.projects` with `extends: true` do, don't get the plugin's inline list, so by default Node loads their libraries unlinked ([issue #56](https://github.com/push-based/vite-plugin-ngp/issues/56)). The setup file is added per project, so with this switch they load linked code too.
+
+Where it's weak:
+
+- **It needs pool `forks` or `threads`.** `vmThreads` and `vmForks` load external modules themselves, past the hook, so the plugin stops with an error there.
+- **Browser mode ignores it.** Vite pre-bundles the libraries for the browser, linked, as in the dev server.
+- **A worker that misses loads the linker.** That's about 0.2 s, once per worker, for the first project to meet a library. After that every worker reads the cache. With `cache: false` every worker links what it loads, on every run.
+- **It's measured on one small fixture,** not on a workspace with hundreds of projects, and the playground's three projects are the only other thing it has run on.
+- **Your own code that isn't Angular still goes through Vitest once per project.** A plain TypeScript file, a utility or a service with no decorator, is transformed by Vite and kept in Vitest's cache, which is per project. That's the cheap part of a run, since it's only type-stripping, but a cache that Vitest shared between projects would save it and this doesn't.
+- **A library has to load in Node as it is.** Left to Node, a library's own imports are resolved by Node, not by Vite. One that only works after Vite has resolved or transformed something in it, an alias or a CSS import, has to stay inlined, and then the switch is the wrong tool for that project.
 
 ## Domino's gaps
 
@@ -236,5 +274,5 @@ Pick the server platform if your app renders on the server, or might: it's the f
 - **No `fakeAsync`.** It needs `zone.js`, and the setup above is zoneless. Use Vitest's fake timers and `await fixture.whenStable()` instead.
 - **No type-checking.** Vitest strips types without checking them, as Vite does. Template errors ngp finds, like the `NG8002` above, do fail the spec file, but type errors elsewhere in a spec don't. Run `tsc` on your specs separately.
 - **Your code is analyzed again on every run.** The plugin's cache skips ngp's code generation for an unchanged module, but the analyzer still reads every module a run imports, to compute the key. In the playground compiling cost 2–20 ms per module before the cache; what a run saves on a large app hasn't been measured under Vitest.
-- **Every Vitest project transforms Angular's libraries for itself.** Vitest's module cache is keyed on the project, and the plugin's output cache sits in a directory per project by default, because Vitest gives each project its own `cacheDir`. In a workspace with many projects, `cache: {dir}` lets them share the linking: about 0.1 s of the roughly 0.75 s a project's first run costs over its second, in the one case measured. Most of the rest is Vitest's own work, and stays per project. With `workspaceRoot` as well, projects with the same compiler options share the modules they compile from your own libraries. See [Sharing one directory between projects](how-it-works#sharing-one-directory-between-projects).
+- **By default every Vitest project transforms Angular's libraries for itself.** Vitest's module cache is keyed on the project, and the plugin's output cache sits in a directory per project, because Vitest gives each project its own `cacheDir`. In a workspace with many projects, three options change that. `cache: {dir}` lets them share the linking: about 0.1 s of the roughly 0.75 s a project's first run costs over its second, in the one case measured. [`test.externalLibraries`](testing#libraries-left-to-node) removes most of the rest, which is Vitest's own transform of the libraries. And `workspaceRoot` lets projects with the same compiler options share the modules they compile from your own libraries. See [Sharing one directory between projects](how-it-works#sharing-one-directory-between-projects).
 - **Coverage hasn't been tried.** ngp returns source maps, so `@vitest/coverage-v8` should map back to your files, but nobody has checked.

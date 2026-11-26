@@ -119,6 +119,7 @@ A workspace that runs Vitest per project gets one output cache per project: Vite
 ngp({
   workspaceRoot: workspace,
   cache: {dir: path.join(workspace, 'node_modules/.cache/vite-plugin-ngp')},
+  test: {externalLibraries: true},
 }),
 ```
 
@@ -126,9 +127,18 @@ Use an absolute path from the workspace root, as here. A relative one resolves f
 
 `cache.dir` shares library code: a library one project linked is read by the next. `workspaceRoot` shares your own libraries under `libs/`. Every project in an Nx workspace has its own `tsconfig.spec.json`, and by default ngp writes paths into compiled code from that file's folder, so `libs/ui/src/button.ts` compiles to different code in each project that imports it. With `workspaceRoot` the paths start at the workspace root, and projects whose compiler options are the same read each other's compiled modules. "The same" leaves out where each tsconfig is and its `outDir`, and includes the template checks. So keep `strictTemplates` and the other `angularCompilerOptions` in `tsconfig.base.json`: projects that override one compile for themselves. Set `workspaceRoot` in every project or in none.
 
+`test.externalLibraries` is the one that saves the most. Vitest transforms every inlined Angular library once per project, whatever the plugin has cached. With the switch, Node loads the libraries and a hook links them from the shared directory, so a project's first run costs about what its later ones do. It changes what `vi.mock` reaches, and needs pool `forks` or `threads`: see [Libraries left to Node](testing#libraries-left-to-node).
+
 The directory isn't a task output. Every project's test target writes to it, so leave it out of `outputs` in `project.json`, and restore it in CI the way you restore `node_modules`. It works within one checkout on one machine: keys hold absolute paths, so it can't go through Nx's remote cache to a machine that checked the repo out somewhere else.
 
-This wasn't run in an Nx workspace. The repo's test uses two plain Vite roots that share a directory. [Sharing one directory between projects](how-it-works#sharing-one-directory-between-projects) has what it measured for linked libraries, which is a small saving: about 0.1 s per project that Vitest hasn't run before. What sharing compiled modules saves on a real workspace wasn't measured.
+What the three don't do:
+
+- **Projects with different template checks don't share compiled modules.** An override of `strictTemplates`, or of any other compiler option, in one project's tsconfig puts that project in a group of its own.
+- **Plain TypeScript with no Angular in it is still transformed once per project.** It's only type-stripping, and Vitest caches it per project.
+- **`vi.mock` no longer reaches an import from one library to another** with `test.externalLibraries`, and the vm pools are refused.
+- **The cache doesn't travel between machines.** Keys hold absolute paths.
+
+This wasn't run in an Nx workspace. The repo's test uses two plain Vite roots that share a directory. [Sharing one directory between projects](how-it-works#sharing-one-directory-between-projects) and [Libraries left to Node](testing#libraries-left-to-node) have what was measured, on the plugin's own fixture: `cache.dir` alone saves about 0.1 s per project that Vitest hasn't run before, and `test.externalLibraries` takes that project from about 1.1 s to about 0.35 s. What sharing compiled modules saves on a real workspace wasn't measured.
 
 ## What Ghostfolio needed
 

@@ -94,3 +94,17 @@ test('links every declaration in Angular’s own packages', async () => {
     assert.ok(declarations > 0, `${pkg} should ship partial declarations`);
   }
 });
+
+test('the text a module is linked from has its closing source map comment blanked, as Vite hands it over', async () => {
+  const {withoutSourceMapComment, linkerKey} = await import('../dist/linker-filter.js');
+  const code = 'export const a = 1;\n';
+  const comment = '//# sourceMappingURL=common.mjs.map';
+  // What Node reads from disk, and what Vite gives a transform: the same length, so maps hold.
+  assert.equal(withoutSourceMapComment(`${code}${comment}\n`), `${code}${' '.repeat(comment.length)}\n`);
+  assert.equal(withoutSourceMapComment(`${code}${' '.repeat(comment.length)}\n`), `${code}${' '.repeat(comment.length)}\n`);
+  // Only the comment that ends the module: the same text inside it stays.
+  const inside = `const text = \`\n${comment}\n\`;\n`;
+  assert.equal(withoutSourceMapComment(inside), inside);
+  assert.deepEqual(linkerKey('/lib/a.mjs', code, false), ['linker', '/lib/a.mjs', code]);
+  assert.deepEqual(linkerKey('/lib/a.mjs', code, true), ['linker', '/lib/a.mjs', code, 'jit']);
+});
