@@ -7,6 +7,13 @@ description: What changed in vite-plugin-ngp, newest first, for anyone following
 
 What changed in vite-plugin-ngp, newest first, written for people using it. Every entry links to the page that documents it. Versions on npm, with the commits in each, are in the repo's [CHANGELOG.md](https://github.com/push-based/vite-plugin-ngp/blob/main/CHANGELOG.md) and its [GitHub releases](https://github.com/push-based/vite-plugin-ngp/releases).
 
+## 26 November 2026
+
+### Server rendering
+
+- `ssr: true` now runs `@angular/ssr` when your app depends on it, with the files `ng new --ssr` writes: an Express `server.ts` on `AngularNodeAppEngine`, `main.server.ts` exporting the bootstrap function, and server routes. `Prerender`, `Server` and `Client` render modes, status codes and redirects work in the dev server and from the built `dist/server/server.js`, and `vite build` prerenders, calling `getPrerenderParams`. Before, server rendering meant a `render(url, document)` function and a server you wrote, with no status codes; apps without `@angular/ssr` still work that way. New `ssr.server` and `ssr.allowedHosts` options. `@angular/ssr` with `i18n` isn't supported yet. [Server rendering](server-rendering#with-angular-ssr), [Configuration](configuration)
+- The `app-ssr` template of `create-ngp` now scaffolds that setup in place of its `server.mjs`: `npm start` runs `node dist/server/server.js`, and every route is prerendered to start with. [Using Vite+](vite-plus#the-templates)
+
 ## 25 November 2026
 
 ### Angular
