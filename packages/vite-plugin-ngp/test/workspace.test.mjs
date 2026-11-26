@@ -42,7 +42,7 @@ async function compiledEntries(dir, selector) {
  * a file behind, then runs project `b`. Resolves to whether `b` ran `a`'s badge, and to the badge
  * entries in the directory afterwards.
  */
-async function aThenB(label, optionsFor, prepare = async () => {}) {
+async function aThenB(label, optionsFor, prepare = async () => {}, optionsForB = optionsFor) {
   const workspace = await copyFixture('workspace', label);
   const dir = path.join(workspace, 'node_modules/.cache/ngp');
   await prepare(workspace);
@@ -54,7 +54,7 @@ async function aThenB(label, optionsFor, prepare = async () => {}) {
   badge.value.result.code += `\nimport {writeFileSync as __ngpMark} from 'node:fs';\n__ngpMark(${JSON.stringify(ranElsewhere)}, '');\n`;
   await fs.writeFile(badge.file, JSON.stringify(badge.value));
 
-  const second = await runProject(workspace, 'b', optionsFor(workspace, dir));
+  const second = await runProject(workspace, 'b', optionsForB(workspace, dir));
   assert.equal(second.ok, true, second.output);
   return {
     shared: await fs.access(ranElsewhere).then(() => true, () => false),
@@ -91,6 +91,13 @@ test('projects whose template checks differ do not share: the entry holds the di
     await fs.writeFile(tsconfig, JSON.stringify(config));
   });
   assert.equal(shared, false);
+  assert.equal(badges.length, 2);
+});
+
+test('projects whose plugin options change the code do not share: test.jitCompat', async () => {
+  const shared = (workspace, dir) => ({cache: {dir}, workspaceRoot: workspace});
+  const {shared: read, badges} = await aThenB('jit', shared, undefined, (workspace, dir) => ({...shared(workspace, dir), test: {jitCompat: true}}));
+  assert.equal(read, false);
   assert.equal(badges.length, 2);
 });
 
