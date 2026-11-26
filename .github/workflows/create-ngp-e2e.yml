@@ -88,7 +88,7 @@ jobs:
         if: matrix.template == 'app-ssr'
         working-directory: ${{ runner.temp }}/e2e
         run: |
-          node server.mjs &
+          node dist/server/server.js &
           for attempt in $(seq 1 30); do
             curl -sf -H 'Accept: text/html' http://localhost:4000/ -o page.html && break
             sleep 1
