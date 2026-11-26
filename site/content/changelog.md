@@ -17,6 +17,7 @@ What changed in vite-plugin-ngp, newest first, written for people using it. Ever
 ### Output cache
 
 - `cache: {dir: 'path'}` names the directory the output cache lives in, so every project of a workspace can use the same one. Under Vitest each project had its own, and linked every Angular library for itself. With one directory, a library one project linked is read by the others. Your own compiled modules stay per project, as before, and no cache key changed. It's a small saving on its own: about 0.1 s for a project Vitest has never run, in the case measured. `cache: true` and `cache: false` work as they did. [Configuration](configuration#when-to-change-them), [How it works](how-it-works#sharing-one-directory-between-projects), [Nx](nx#one-output-cache-for-the-workspace)
+- `workspaceRoot` lets the projects of a workspace share the modules they compile, not only linked libraries. ngp writes a class's file into compiled code as a path from the folder of the project's tsconfig, so a library file two projects import compiled to different code in each. With `workspaceRoot` the path starts at the workspace root, and projects on one `cache.dir` whose compiler options are the same compile the file once. Projects with different template checks still compile for themselves. The cache key no longer holds where a tsconfig is or its `outDir`, so every cache misses once after the update. [Configuration](configuration#when-to-change-them), [How it works](how-it-works#sharing-one-directory-between-projects)
 
 ## 25 November 2026
 

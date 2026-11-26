@@ -1,12 +1,13 @@
 // Template HMR for a component outside the folder that holds the app's tsconfig, as a library in
 // a monorepo is (apps/landing next to libs/ui). The compiled component listens for an id built
-// from its absolute path there, so the update the plugin sends has to carry the same id. Run
-// `pnpm build` first; needs an ngp toolchain build.
+// from its absolute path there, so the update the plugin sends has to carry the same id. With
+// `workspaceRoot` both sides build it from the workspace root instead. Run `pnpm build` first;
+// needs an ngp toolchain build.
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import {after, before, test} from 'node:test';
+import {test} from 'node:test';
 import {fileURLToPath} from 'node:url';
 import {createServer} from 'vite';
 
@@ -16,12 +17,6 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../../..');
 const toolchain = process.env.NGP_TOOLCHAIN ?? path.join(repo, 'toolchain/out');
 
-let workspace;
-let root;
-let button;
-let server;
-let sent = [];
-
 async function until(condition) {
   const deadline = Date.now() + 10_000;
   while (!condition() && Date.now() < deadline) {
@@ -29,12 +24,13 @@ async function until(condition) {
   }
 }
 
-before(async () => {
+/** An app at `apps/landing` that bootstraps a button from `libs/ui`, served with `options`. */
+async function start(options = () => ({})) {
   // Inside the repo, so Angular resolves from the root node_modules.
-  workspace = await fs.mkdtemp(path.join(here, '.hmr-outside-'));
-  root = path.join(workspace, 'apps/landing');
+  const workspace = await fs.mkdtemp(path.join(here, '.hmr-outside-'));
+  const root = path.join(workspace, 'apps/landing');
   const lib = path.join(workspace, 'libs/ui/src');
-  button = path.join(lib, 'button.ts');
+  const button = path.join(lib, 'button.ts');
   await fs.mkdir(path.join(root, 'src'), {recursive: true});
   await fs.mkdir(lib, {recursive: true});
   await fs.writeFile(
@@ -54,44 +50,71 @@ before(async () => {
   );
   await fs.writeFile(path.join(lib, 'button.html'), '<span>before</span>\n');
 
-  server = await createServer({
+  const server = await createServer({
     root,
     cacheDir: path.join(root, '.vite'),
     configFile: false,
     logLevel: 'silent',
-    plugins: [ngp({toolchain, typeCheck: false})],
+    plugins: [ngp({toolchain, typeCheck: false, ...options(workspace)})],
     server: {middlewareMode: true, ws: false},
+    // No dependency scan: it outlives `close()` and writes into the workspace while the test
+    // removes it. Nothing here runs in a browser, so nothing needs a pre-bundle.
+    optimizeDeps: {noDiscovery: true},
   });
   // Vite only watches its root. An app with a library outside it adds the folder itself.
   server.watcher.add(lib);
   await until(() => server.watcher.getWatched()[lib]?.includes('button.html'));
+  const sent = [];
   const hot = server.environments.client.hot;
   const send = hot.send.bind(hot);
   hot.send = (payload, ...rest) => {
     sent.push(payload);
     return send(payload, ...rest);
   };
-});
+  return {
+    server,
+    button,
+    sent,
+    async close() {
+      await server.close();
+      await fs.rm(workspace, {recursive: true, force: true, maxRetries: 3, retryDelay: 50});
+    },
+  };
+}
 
-after(async () => {
-  await server?.close();
-  if (workspace) {
-    await fs.rm(workspace, {recursive: true, force: true});
-  }
-});
-
-test('a template edit outside the app root sends the id its component listens for', async () => {
+/** Edits the button's template, and resolves to the id its component listens for and the ids sent. */
+async function editTemplate({server, button, sent}) {
   const compiled = await server.environments.client.transformRequest(`/@fs${button}`);
   // The HMR initializer: `const id = "<encoded id>"`, then a listener for `d.id === id`.
   const listened = /const id = "([^"]+)";\s*function Button_HmrLoad/.exec(compiled.code)?.[1];
   assert.ok(listened, `no HMR initializer in the compiled component:\n${compiled.code}`);
 
-  sent = [];
+  sent.length = 0;
   await fs.writeFile(path.join(path.dirname(button), 'button.html'), '<span>after</span>\n');
   const updates = () => sent.filter((p) => p.type === 'custom' && p.event === 'angular:component-update');
   await until(() => updates().length > 0);
-
-  assert.deepEqual(updates().map((p) => decodeURIComponent(p.data.id)), [decodeURIComponent(listened)]);
-  assert.equal(decodeURIComponent(listened), `${button.split(path.sep).join('/')}@Button`);
   assert.equal(sent.filter((p) => p.type === 'full-reload').length, 0);
+  return {listened: decodeURIComponent(listened), updated: updates().map((p) => decodeURIComponent(p.data.id))};
+}
+
+test('a template edit outside the app root sends the id its component listens for', async () => {
+  const app = await start();
+  try {
+    const {listened, updated} = await editTemplate(app);
+    assert.deepEqual(updated, [listened]);
+    assert.equal(listened, `${app.button.split(path.sep).join('/')}@Button`);
+  } finally {
+    await app.close();
+  }
+});
+
+test('with workspaceRoot the id is the path from the workspace root, on both sides', async () => {
+  const app = await start((workspace) => ({workspaceRoot: workspace}));
+  try {
+    const {listened, updated} = await editTemplate(app);
+    assert.deepEqual(updated, [listened]);
+    assert.equal(listened, 'libs/ui/src/button.ts@Button');
+  } finally {
+    await app.close();
+  }
 });

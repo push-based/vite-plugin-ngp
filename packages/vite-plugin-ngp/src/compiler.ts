@@ -6,11 +6,34 @@ import {FileUpdateType, loadNgp, type Analyzer, type ClassMetadata, type Engine,
 import {stableJson, toolchainId, type OutputCache} from './output-cache.js';
 import {blankHmrInitializers} from './static-defer.js';
 
+/**
+ * Compiler options that only say where a project's tsconfig is and where `tsc` would write. They
+ * differ between two projects with the same settings, and nothing the plugin hands to ngp reads
+ * them: `HybridCompiler` gets its options from `hybridOptions`, with the root passed on its own.
+ * `configFilePath`, `basePath` and `genDir` are the ones compiler-cli adds from the tsconfig's
+ * path.
+ */
+const LOCATION_OPTIONS = ['configFilePath', 'basePath', 'genDir', 'outDir', 'declarationDir', 'tsBuildInfoFile', 'rootDir'];
+
+/**
+ * `ngOptions` for the cache key: every option but the ones in `LOCATION_OPTIONS`. Whatever isn't
+ * known to be about location stays in, the template checks among them, so two projects share a
+ * compiled module only when they would also report the same diagnostics for it.
+ */
+export function withoutLocation(ngOptions: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(ngOptions).filter(([name]) => !LOCATION_OPTIONS.includes(name)));
+}
+
 export interface CompilerOptions {
   toolchainDir: string;
   engine: Engine;
-  /** The user's tsconfig: compiler options and rootDir come from here. */
+  /** The user's tsconfig: compiler options come from here, and rootDir when none is given. */
   tsconfig: string;
+  /**
+   * The folder ngp writes paths in compiled code relative to (`workspaceRoot`). Default: the
+   * tsconfig's folder.
+   */
+  rootDir?: string;
   /** The tsconfig the analyzer reads. See writeEntryTsconfig for why it can differ. */
   analyzerTsconfig: string;
   /** Emit component HMR code, as the CLI's dev server does. */
@@ -107,7 +130,7 @@ export class NgpCompiler {
       backend: options.engine,
       ...binding,
     });
-    const rootDir = path.dirname(options.tsconfig);
+    const rootDir = options.rootDir ?? path.dirname(options.tsconfig);
     // No tsconfigPath: with one, ngp rewrites .ngdiag.json after every chunk.
     const hybridOptions = {
       optimize: true,
@@ -133,16 +156,16 @@ export class NgpCompiler {
     }
     const typeCheckHybrid = new api.HybridCompiler(analyzer, {...hybridOptions, enableHmr: false, preserveWhitespaces: true});
     const replacements = options.fileReplacements ?? new Map<string, string>();
-    // The ngp build, the engine, and every option that reaches ngp. `tcbConfig` only shapes
-    // type-check blocks. The root stays in: compiled code names its stylesheets by absolute path,
-    // so a cache copied to another checkout must miss.
+    // The ngp build, the engine, and every option that reaches ngp. `tcbConfig` is left out of
+    // `hybrid` because it follows from the compiler options below. The root stays in: ngp writes
+    // paths relative to it into the code.
     const cacheIdentity = options.cache
       ? JSON.stringify({
           toolchain: await toolchainId(options.toolchainDir),
           engine: options.engine,
           staticDefer: options.staticDefer === true,
           hybrid: {...hybridOptions, tcbConfig: undefined},
-          ngOptions: stableJson(ngOptions),
+          ngOptions: stableJson(withoutLocation(ngOptions)),
         })
       : '';
     const compiler = new NgpCompiler(
