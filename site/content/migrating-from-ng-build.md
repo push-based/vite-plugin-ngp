@@ -121,7 +121,9 @@ Every option of `@angular/build:application`, as of Angular 22.3:
 | `inlineStyleLanguage` | Not supported: inline `styles` are plain CSS, because ngp compiles them. Move preprocessed styles to a `styleUrl` file |
 | `localize`, `i18nMissingTranslation` | The plugin's `i18n` option: `locales` names the locales to build, `missingTranslation` replaces `i18nMissingTranslation`. See [Internationalization](i18n) |
 | `i18nDuplicateTranslation` | No equivalent. A message id that appears twice in one translation file is an error. When a locale has several files, the last file's translation wins, with no warning |
-| `prerender`, `appShell`, `outputMode` | Not supported. Prerender with a script that calls your `render` function; this docs site does that |
+| `server`, `ssr`, `prerender`, `outputMode` | With `@angular/ssr`, `ssr: true` in the plugin. It finds `src/main.server.ts` and `src/server.ts` by name, and `vite build` prerenders what your server routes ask for, as `outputMode: 'server'` does. Change `browserDistFolder` in `server.ts` to `../client`. See [Server rendering](server-rendering#with-angular-ssr) |
+| `security.allowedHosts` | `ssr: {allowedHosts: [...]}` |
+| `appShell` | Not supported |
 | `serviceWorker` | Not supported. `ngsw-config` from `@angular/service-worker` can generate the manifest from the built output, but that's untested here |
 | `subresourceIntegrity` | Not supported |
 | `security` (`autoCsp`) | Not supported |
@@ -132,7 +134,7 @@ The CLI also reads `.browserslistrc` for its syntax target. Vite doesn't: set `b
 
 If your production build relies on any of these, it can't move to the plugin today:
 
-- **Prerendering and `@angular/ssr`.** Route render modes, `AngularNodeAppEngine`, the app shell. Server rendering works through the plugin's own [`render` contract](server-rendering).
+- **`@angular/ssr` with i18n, or the app shell.** `@angular/ssr` itself works, render modes and prerendering included, for one locale ([Server rendering](server-rendering#with-angular-ssr)).
 - **Sass, Less or other preprocessors in inline `styles`.** `styleUrl` files and global styles are fine: Vite compiles those.
 - **The service worker.** `@angular/service-worker`'s manifest isn't generated.
 - **Critical CSS inlining, subresource integrity and `autoCsp`.**

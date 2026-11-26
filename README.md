@@ -21,7 +21,7 @@ A first version on top of a prototype compiler. Everything below was checked in 
 
 - Per-module compilation from the code Vite hands over, in dev and in production builds.
 - Component HMR for external templates, stylesheets, and inline `template` and `styles`. Other `.ts` edits reload the page, as under `ng serve`.
-- Server rendering with hydration, in the dev server and in builds.
+- Server rendering with hydration, in the dev server and in builds, with `@angular/ssr`: render modes, status codes and prerendering.
 - Template and TypeScript type-checking in a separate process, with TypeScript 7 or tsrs. Errors show in the terminal and the browser overlay, and fail `vite build`.
 - Production builds with Angular's linker and the CLI's build optimizer. The JavaScript comes out within 3% of `ng build`'s.
 - Component stylesheets through Vite's CSS pipeline, so Sass and PostCSS work, with Angular's view encapsulation.
@@ -31,7 +31,7 @@ A first version on top of a prototype compiler. Everything below was checked in 
 - Builds and test runs reuse compiled output from the last run, for every module whose inputs haven't changed.
 - Vite+: `vp create @push-based/ngp` for a new app, `vp migrate` for an existing one, then `vp dev`, `vp build`, `vp test` and `vp check`.
 
-**Not yet:** preprocessors in inline `styles`, HTTP status codes from SSR, the service worker, library builds, and Windows outside WSL 2, which is untested.
+**Not yet:** preprocessors in inline `styles`, `@angular/ssr` with i18n, the service worker, library builds, and Windows outside WSL 2, which is untested.
 
 **The catch.** It's on npm as [`@push-based/vite-plugin-ngp`](https://www.npmjs.com/package/@push-based/vite-plugin-ngp), but ngp isn't published, so the package carries its own build of it, made from Angular's source, and it runs on Angular 22.3 only, from `22.3.0-rc.0` on. The plugin also uses ngp below its intended surface, so any Angular commit can break it. The [status page](https://push-based.github.io/vite-plugin-ngp/status/) lists every limit.
 

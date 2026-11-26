@@ -14,7 +14,15 @@ import {
   type UserConfig,
   type ViteDevServer,
 } from 'vite';
-import {findAngularLibraries, packagePathPattern, packagePattern} from './angular-libraries.js';
+import {dependencyClosure, findAngularLibraries, packagePathPattern, packagePattern} from './angular-libraries.js';
+import {
+  angularSsrDevMiddleware,
+  angularSsrPlugin,
+  MAIN_SERVER_ID,
+  SERVER_ID,
+  usesAngularSsr,
+  type AngularSsrFiles,
+} from './angular-ssr.js';
 import {budgetsPlugin, type Budget} from './budgets.js';
 import {NgpCompiler, type ComponentStyle, type HmrUpdate, type TransformResult} from './compiler.js';
 import {writeEntryTsconfig} from './entry-tsconfig.js';
@@ -73,14 +81,19 @@ export interface NgpPluginOptions {
    */
   hmr?: boolean;
   /**
-   * Server-side rendering. Ignored under Vitest. The entry module default-exports
+   * Server-side rendering. Ignored under Vitest. `true` means the entry is `src/main.server.ts`.
+   * Off by default. `vite build` builds the client into `<build.outDir>/client` and the server
+   * into `<build.outDir>/server` (`build.outDir` defaults to `dist`).
+   *
+   * When the app depends on `@angular/ssr`, it's rendered the Angular CLI's way: the entry
+   * default-exports the bootstrap function, `src/server.ts` (`server`) is the Node server built on
+   * `AngularNodeAppEngine`, server routes set each route's render mode, and `vite build`
+   * prerenders the routes that ask for it. Without `@angular/ssr`, the entry default-exports
    * `render(url: string, document: string): Promise<string>`, which turns index.html into the
-   * rendered page. In dev, the plugin renders every page request through it. `vite build` then
-   * builds the client into `<build.outDir>/client` and the entry into `<build.outDir>/server`
-   * (`build.outDir` defaults to `dist`). `true` means the entry is `src/main.server.ts`. Off by
-   * default.
+   * rendered page, and the app serves the build itself. Either way the dev server renders every
+   * page request.
    */
-  ssr?: boolean | {entry?: string};
+  ssr?: boolean | SsrOptions;
   /**
    * Type-check templates and TypeScript: TypeScript 7 (`tsgo`) checks the app's sources together
    * with ngp's type-check blocks, in a child process, and errors in a block are reported at their
@@ -131,6 +144,24 @@ export interface NgpPluginOptions {
   test?: TestOptions;
 }
 
+export interface SsrOptions {
+  /** The server entry, relative to Vite's root. Defaults to `src/main.server.ts`. */
+  entry?: string;
+  /**
+   * With `@angular/ssr`: the Node server, relative to Vite's root, built into
+   * `<build.outDir>/server/server.js`. In dev, the plugin hands requests to its `reqHandler`
+   * export. Defaults to `src/server.ts` when that file exists.
+   */
+  server?: string;
+  /**
+   * With `@angular/ssr`: the hosts the server renders pages for, written into the build's
+   * manifest like angular.json's `security.allowedHosts`. `AngularNodeAppEngine` answers any other
+   * Host with 400. Defaults to `['localhost']`. The dev server leaves the check to Vite's
+   * `server.allowedHosts`.
+   */
+  allowedHosts?: string[];
+}
+
 export interface TestOptions {
   /**
    * Keep what `TestBed.overrideComponent`, `overrideModule` and `overrideTemplate` need to
@@ -165,6 +196,8 @@ interface CompilerApi extends StylesPluginContext {
   cache(): OutputCache | null;
   /** Each component stylesheet in an app module, from the browser compiler's analyzer. */
   componentStyles(file: string): Promise<ComponentStyle[]>;
+  /** The `@angular/ssr` files, once Vite's root is known. Null without `@angular/ssr`. */
+  angularSsr(): AngularSsrFiles | null;
 }
 
 /** File replacements, both ways, as absolute paths. Filled in once Vite's root is known. */
@@ -255,6 +288,9 @@ export function ngp(options: NgpPluginOptions = {}): Plugin[] {
     ...(polyfills.length > 0 ? [polyfillsPlugin(polyfills, () => compiler.api.entries())] : []),
     ...(usesZone(polyfills) ? [zoneAsyncPlugin()] : []),
     ...(options.i18n ? [i18nPlugin(options.i18n, () => compiler.api.entries(), !!options.ssr && !isVitest())] : []),
+    ...(options.ssr && !isVitest()
+      ? [angularSsrPlugin(() => compiler.api.angularSsr(), ssrOptionsOf(options)?.allowedHosts ?? ['localhost'], () => polyfills)]
+      : []),
   ];
 }
 
@@ -283,8 +319,12 @@ function compilerPlugin(
   }
   /** `test.extendedDiagnostics`: an extended diagnostic that would fail a spec warns instead. */
   const extendedAsWarnings = testing && options.test?.extendedDiagnostics === 'warning';
-  const ssrOptions = testing ? null : options.ssr === true ? {} : options.ssr || null;
+  const ssrOptions = testing ? null : ssrOptionsOf(options);
   const ssrEntry = ssrOptions ? (ssrOptions.entry ?? 'src/main.server.ts') : null;
+  /** Set in `config`: whether the app uses `@angular/ssr`, and its files. */
+  let angularSsr: AngularSsrFiles | null = null;
+  /** With `@angular/ssr`: the packages it brings that the server bundle has to include. */
+  let angularSsrDependencies: string[] = [];
   /**
    * Latest update module per component, served at `/@ng/component?c=<id>`. Keyed by the decoded
    * id (`src/app/home.ts@Home`), which is what the `c` query parameter decodes to.
@@ -602,6 +642,7 @@ function compilerPlugin(
         const compiler = compilers.get('client');
         return compiler ? (await compiler).componentStyles(file) : [];
       },
+      angularSsr: () => angularSsr,
     },
     // Before Vite's own TypeScript transform: ngp returns TypeScript, and Vite strips the types.
     enforce: 'pre',
@@ -612,6 +653,15 @@ function compilerPlugin(
       serve = env.command === 'serve';
       hmr = serve && options.hmr !== false && !testing;
       root = path.resolve(userConfig.root ?? process.cwd());
+      if (ssrEntry && usesAngularSsr(root)) {
+        angularSsr = {mainServer: path.resolve(root, ssrEntry), server: angularSsrServer(root, ssrOptions?.server)};
+        // `@angular/ssr` imports beasties, which a strict package manager keeps out of the app's
+        // reach, and so are its dependencies.
+        angularSsrDependencies = dependencyClosure('@angular/ssr', root);
+        if (options.i18n) {
+          throw new Error('[vite-plugin-ngp] i18n with @angular/ssr is not supported yet: use the render(url, document) server entry');
+        }
+      }
       if (testing) {
         // Vitest leaves node_modules to Node, which would load Angular libraries unlinked, and
         // they'd need the JIT compiler. Inlining them sends them through the linker, and keeps
@@ -634,7 +684,10 @@ function compilerPlugin(
         ...(ssrEntry && {
           // `vite build` builds every environment: the browser bundle and the server entry.
           builder: {},
-          environments: ssrEnvironments(userConfig, ssrEntry),
+          environments: ssrEnvironments(
+            userConfig,
+            angularSsr ? {'main.server': MAIN_SERVER_ID, ...(angularSsr.server ? {server: SERVER_ID} : {})} : ssrEntry,
+          ),
         }),
       };
     },
@@ -646,7 +699,7 @@ function compilerPlugin(
       // Server environments externalize node_modules by default, and Node would then load Angular
       // libraries unlinked, which needs the JIT compiler. Bundling them runs the linker, and keeps
       // a single copy of @angular/core.
-      const noExternal = [/^@angular\//, ...findAngularLibraries(root).map(packagePattern)];
+      const noExternal = [/^@angular\//, ...findAngularLibraries(root).map(packagePattern), ...angularSsrDependencies.map(packagePattern)];
       return {
         define: {ngServerMode: 'true', ngHmrMode: 'false'},
         resolve: {noExternal},
@@ -658,7 +711,7 @@ function compilerPlugin(
           ? {
               optimizeDeps:
                 ssrEntry && name === 'ssr'
-                  ? serverOptimizeDeps(noExternal)
+                  ? serverOptimizeDeps(noExternal, angularSsr)
                   : {rolldownOptions: {plugins: [linkerRolldownPlugin()]}},
             }
           : {}),
@@ -677,7 +730,9 @@ function compilerPlugin(
       if (options.entries) {
         entries = options.entries.map((e) => path.resolve(config.root, e));
       } else {
-        const defaults = testing ? [] : ['src/main.ts', 'src/main.server.ts', ...(ssrEntry ? [ssrEntry] : [])];
+        const defaults = testing
+          ? []
+          : ['src/main.ts', 'src/main.server.ts', ...(ssrEntry ? [ssrEntry] : []), ...(angularSsr?.server ? [angularSsr.server] : [])];
         entries = [...new Set(defaults.map((e) => path.resolve(config.root, e)))].filter((e) => fs.existsSync(e));
       }
       for (const {replace, with: replacement} of options.fileReplacements ?? []) {
@@ -728,6 +783,10 @@ function compilerPlugin(
       // /index.html, and before Vite would serve that file as it is.
       const renderPages = () => {
         if (!ssrEntry) {
+          return;
+        }
+        if (angularSsr) {
+          server.middlewares.use(angularSsrDevMiddleware(server, angularSsr));
           return;
         }
         server.middlewares.use(async (req, res, next) => {
@@ -1092,12 +1151,28 @@ function linkerPlugin(api: CompilerApi, jit: boolean): Plugin {
   };
 }
 
+function ssrOptionsOf(options: NgpPluginOptions): SsrOptions | null {
+  return options.ssr === true ? {} : options.ssr || null;
+}
+
+/** The `@angular/ssr` Node server: the `server` option, or `src/server.ts` when it exists. */
+function angularSsrServer(root: string, option: string | undefined): string | null {
+  const file = path.resolve(root, option ?? 'src/server.ts');
+  if (fs.existsSync(file)) {
+    return file;
+  }
+  if (option) {
+    throw new Error(`[vite-plugin-ngp] ssr.server is ${option}, and ${file} does not exist`);
+  }
+  return null;
+}
+
 /**
  * With `ssr`, the browser bundle goes to `<build.outDir>/client` and the server entry to
  * `<build.outDir>/server`. An environment's own `build.outDir` wins over the top-level one, so
  * these follow the app's `build.outDir`, and an outDir the app set on an environment is kept.
  */
-function ssrEnvironments(userConfig: UserConfig, ssrEntry: string): UserConfig['environments'] {
+function ssrEnvironments(userConfig: UserConfig, ssrEntry: string | Record<string, string>): UserConfig['environments'] {
   const outDir = userConfig.build?.outDir ?? 'dist';
   const outDirOf = (name: 'client' | 'ssr', folder: string) =>
     userConfig.environments?.[name]?.build?.outDir ? {} : {outDir: path.join(outDir, folder)};
@@ -1117,7 +1192,7 @@ function ssrEnvironments(userConfig: UserConfig, ssrEntry: string): UserConfig['
  * the bundle and for the app. The cache lives in `node_modules/.vite/deps_ssr`, keyed by the
  * lockfile and the config, like the client's.
  */
-function serverOptimizeDeps(noExternal: RegExp[]): DepOptimizationOptions {
+function serverOptimizeDeps(noExternal: RegExp[], angularSsr: AngularSsrFiles | null): DepOptimizationOptions {
   const bundled = (id: string) => noExternal.some((pattern) => pattern.test(id));
   const externalizer: RolldownPlugin = {
     name: 'vite-plugin-ngp:ssr-external',
@@ -1153,6 +1228,10 @@ function serverOptimizeDeps(noExternal: RegExp[]): DepOptimizationOptions {
   };
   return {
     noDiscovery: false,
+    // With `@angular/ssr`, the input is the plugin's generated entries, which the scan can't read.
+    // It scans the app's server entry instead, and `@angular/ssr` is listed, since the generated
+    // entries import it. server.ts isn't scanned: it imports Express and the like, which Node loads.
+    ...(angularSsr && {entries: [angularSsr.mainServer], include: ['@angular/ssr', '@angular/ssr/node']}),
     rolldownOptions: {
       // The server environment's `define` (the `config` and `configEnvironment` hooks), baked in
       // so Vite's define transform finds nothing to replace in the pre-bundle on each start.

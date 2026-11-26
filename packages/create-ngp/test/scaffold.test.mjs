@@ -110,11 +110,11 @@ describe('scaffold', () => {
     scaffold({targetDir: ssr, template: 'app-ssr', packageName: 'b', pluginVersion: '1.0.0'});
 
     const extra = files(ssr).filter((f) => !files(app).includes(f));
-    assert.deepEqual(extra, ['server.mjs', 'src/main.server.ts']);
+    assert.deepEqual(extra, ['src/app/app.config.server.ts', 'src/app/app.routes.server.ts', 'src/main.server.ts', 'src/server.ts']);
     assert.match(readFileSync(join(ssr, 'vite.config.ts'), 'utf8'), /ngp\(\{ ssr: true \}\)/);
     assert.match(readFileSync(join(ssr, 'src/app/app.config.ts'), 'utf8'), /provideClientHydration\(withEventReplay\(\)\)/);
     assert.doesNotMatch(readFileSync(join(app, 'src/app/app.config.ts'), 'utf8'), /provideClientHydration/);
-    assert.equal(JSON.parse(readFileSync(join(ssr, 'package.json'), 'utf8')).scripts.start, 'node server.mjs');
+    assert.equal(JSON.parse(readFileSync(join(ssr, 'package.json'), 'utf8')).scripts.start, 'node dist/server/server.js');
   });
 
   it('rejects an unknown template', () => {
@@ -154,7 +154,7 @@ describe('the command', () => {
   it('uses ngp-app when no directory is given', () => {
     const cwd = tmp();
     assert.equal(run(['--no-interactive', '--template', 'app-ssr'], cwd).status, 0);
-    assert.ok(existsSync(join(cwd, 'ngp-app', 'server.mjs')));
+    assert.ok(existsSync(join(cwd, 'ngp-app', 'src', 'server.ts')));
   });
 
   it('refuses a directory that isn’t empty, unless told to overwrite it', () => {

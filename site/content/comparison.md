@@ -20,7 +20,7 @@ Analog and `@oxc-angular/vite` were checked in their source and docs on 17 Octob
 | Output matches ngc's | It is ngc | It is ngc | "87%+" of Ivy instructions, by its own tests | Not measured as a whole | Angular's ngp golden tests pass; bundles within 3% of `ng build` |
 | Template type-checking | Yes | Off by default; on under `@analogjs/platform` | No | No | Yes, in a separate process |
 | Component HMR | On by default | Off by default | Off by default | On by default | On by default, with the CLI's rules |
-| SSR | `@angular/ssr`, with prerendering | `@analogjs/platform`, on by default | Same as default | An `ssrEntry` option; not tried here | A `render(url, document)` contract; you write the server |
+| SSR | `@angular/ssr`, with prerendering | `@analogjs/platform`, on by default | Same as default | An `ssrEntry` option; not tried here | `@angular/ssr`, with prerendering; or a `render(url, document)` contract |
 | Linking libraries | The CLI's oxc linker | Angular's linker | Angular's linker | Its own Rust linker | A port of the CLI's oxc linker |
 | How you get it | `npm install` | `npm install`, 2.8.1 | `npm install`, opt-in flag | `npm install`, 0.0.41, "experimental" | `npm install`, 0.2.0; one Angular prerelease |
 
@@ -73,9 +73,9 @@ Four of them use the CLI's runtime protocol: the compiler adds an HMR initialize
 - **`ng serve` and `ng build`** have `@angular/ssr`: `AngularNodeAppEngine`, per-route render modes, prerendering and HTTP status codes.
 - **Analog** does SSR through `@analogjs/platform`, which turns it on by default ([source](https://github.com/analogjs/analog/blob/58a9df609050ba9d43bcc062316a477216a03015/packages/platform/src/lib/platform-plugin.ts#L49)). Its client and server builds share one compiler state and compile one after the other.
 - **`@oxc-angular/vite`** has an `ssrEntry` option and a plugin that writes an SSR manifest, and leaves HMR code out of server transforms. We haven't run its SSR.
-- **vite-plugin-ngp** renders through your own server entry, behind a `render(url, document)` contract, in the dev server and in builds ([Server rendering](server-rendering)). This site is prerendered that way.
+- **vite-plugin-ngp** runs `@angular/ssr` with the CLI's files: `AngularNodeAppEngine` in `server.ts`, server routes with render modes, status codes and redirects, and prerendering in `vite build`. Without `@angular/ssr`, it renders through a `render(url, document)` function of your own ([Server rendering](server-rendering)). This site is prerendered that way.
 
-Where vite-plugin-ngp is weakest here: it has none of `@angular/ssr`'s features. No status codes, so a not-found page answers 200; no per-route render modes; no built-in prerendering, so you write the loop. And the dev server runs two ngp analyzers with SSR on, one per environment ([Server rendering](server-rendering#limits)). If your app relies on `@angular/ssr`, stay on the CLI or Analog for now.
+Where vite-plugin-ngp is weakest here: its `@angular/ssr` support covers one locale, with no app shell, no critical CSS inlining and no preload hints for lazy routes, and it prerenders in one worker where the CLI uses a pool. It reads `@angular/ssr`'s internal manifests, which any Angular release can change. And the dev server runs two ngp analyzers with SSR on, one per environment ([Server rendering](server-rendering#limits)). If your app needs i18n or the app shell on the server, stay on the CLI or Analog for now.
 
 ## Linking libraries
 

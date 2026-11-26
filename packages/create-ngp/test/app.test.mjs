@@ -117,17 +117,19 @@ describe('scaffolded apps', {skip: noNgp}, () => {
       assert.match(app, /ɵɵdefineComponent/);
     });
 
-    it('app-ssr: builds both bundles, passes its spec, and renders pages in dev and from server.mjs', async () => {
+    it('app-ssr: builds and prerenders, passes its spec, and renders pages in dev and from server.ts', async () => {
       const dir = scaffoldApp('vite-ssr', 'app-ssr');
       sh(dir, 'pnpm', ['install']);
+      assertTemplateErrorFailsBuild(dir, 'pnpm', ['run', 'build']);
       sh(dir, 'pnpm', ['run', 'build']);
-      assert.ok(existsSync(join(dir, 'dist', 'server', 'main.server.js')));
+      assert.ok(existsSync(join(dir, 'dist', 'server', 'server.js')));
+      assert.match(readFileSync(join(dir, 'dist', 'client', 'index.html'), 'utf8'), /ng-server-context="ssg"/, 'the home page is prerendered');
       assert.match(sh(dir, 'pnpm', ['test']), /1 passed/);
       const dev = await fetchFrom(dir, 'pnpm', ['exec', 'vite', '--port', '5282', '--strictPort'], 5282, '/', html);
       assert.match(dev, /Clicks: 0/);
-      const built = await fetchFrom(dir, process.execPath, ['server.mjs'], 5283, '/', html);
+      const built = await fetchFrom(dir, 'pnpm', ['start'], 5283, '/', html);
       assert.match(built, /Clicks: 0/);
-      assert.match(built, /ng-server-context/);
+      assert.match(built, /ng-server-context="ssg"/);
     });
   });
 
@@ -152,7 +154,7 @@ describe('scaffolded apps', {skip: noNgp}, () => {
         assert.match(sh(dir, 'vp', ['test', 'run']), /1 passed/);
         if (template === 'app-ssr') {
           assert.match(await fetchFrom(dir, 'vp', ['dev', '--port', String(port), '--strictPort'], port, '/', html), /Clicks: 0/);
-          assert.match(await fetchFrom(dir, process.execPath, ['server.mjs'], port + 10, '/', html), /Clicks: 0/);
+          assert.match(await fetchFrom(dir, process.execPath, ['dist/server/server.js'], port + 10, '/', html), /Clicks: 0/);
         } else {
           assert.match(await fetchFrom(dir, 'vp', ['dev', '--port', String(port), '--strictPort'], port, '/src/app/app.ts'), /ɵɵdefineComponent/);
         }

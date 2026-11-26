@@ -40,6 +40,34 @@ export function findAngularLibraries(root: string, options: {devDependencies?: b
   return libraries.sort();
 }
 
+/**
+ * A package's dependencies, transitively, with the package itself, as Node would find them from
+ * `from`. Each package's own dependencies are looked up from its real path, which is where pnpm
+ * puts them. `@angular/ssr` imports beasties, and with a strict package manager neither beasties
+ * nor its dependencies are reachable from the app's server bundle, so the plugin bundles them all.
+ */
+export function dependencyClosure(name: string, from: string): string[] {
+  const queue = [{name, from}];
+  const seen = new Set<string>();
+  while (queue.length > 0) {
+    const next = queue.shift()!;
+    if (seen.has(next.name)) {
+      continue;
+    }
+    const found = findPackageDir(next.name, next.from);
+    const dir = found && fs.realpathSync(found);
+    const pkg = dir && readPackageJson(path.join(dir, 'package.json'));
+    if (!dir || !pkg) {
+      continue;
+    }
+    seen.add(next.name);
+    for (const dependency of Object.keys({...pkg.dependencies})) {
+      queue.push({name: dependency, from: dir});
+    }
+  }
+  return [...seen].sort();
+}
+
 /** A `resolve.noExternal` pattern for a package and its subpaths. */
 export function packagePattern(name: string): RegExp {
   return new RegExp(`^${escapeRegExp(name)}(?:/|$)`);

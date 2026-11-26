@@ -61,7 +61,7 @@ Both are what `ng new` would give you, on Vite: standalone components, zoneless,
 |---|---|---|
 | Renders | In the browser | On the server, then hydrates in the browser |
 | Plugin options | `ngp()` | `ngp({ ssr: true })` |
-| Extra files | | `src/main.server.ts`, the entry from [Server rendering](server-rendering#the-server-entry), and `server.mjs`, a dependency-free Node server for the build |
+| Extra files | | `ng new --ssr`'s files, as [Server rendering](server-rendering#with-angular-ssr) describes them: `src/server.ts`, an Express server on `@angular/ssr`, `src/main.server.ts`, `app.config.server.ts` and `app.routes.server.ts` |
 | Scripts | `dev`, `build`, `preview`, `test` | `dev`, `build`, `start`, `test` |
 | Spec | `src/app/app.spec.ts`, under Vitest in Node on Domino | The same |
 
@@ -136,7 +136,7 @@ Move the app off `ng build` first, with [Migrating from ng build](migrating-from
 
 ## Server rendering under Vite+
 
-Nothing changes. With `ngp({ ssr: true })`, `vp dev` renders every page through `src/main.server.ts`, and `vp build` writes `dist/client` and `dist/server` as [Server rendering](server-rendering) describes. The `app-ssr` template's `server.mjs` is plain Node: run it with `node server.mjs`.
+Nothing changes. With `ngp({ ssr: true })`, `vp dev` renders every page on the server, and `vp build` writes `dist/client` and `dist/server`, as [Server rendering](server-rendering) describes. In the `app-ssr` template, `vp build` also prerenders, and `node dist/server/server.js` runs the built Express server.
 
 ## Limits
 

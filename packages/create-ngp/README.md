@@ -17,7 +17,7 @@ It asks for a directory and a template, writes the app, and prints what to run n
 | Template | What you get |
 |---|---|
 | `app` | An app rendered in the browser, with routing and a Vitest spec that runs in Node on the server platform's DOM |
-| `app-ssr` | `app`, plus rendering on the server with hydration: `src/main.server.ts`, `ngp({ ssr: true })` and a dependency-free `server.mjs` for the build |
+| `app-ssr` | `app`, plus rendering on the server with `@angular/ssr` and hydration, laid out like `ng new --ssr`: an Express `src/server.ts`, `src/main.server.ts`, server routes, and prerendering in `vite build` |
 
 ```text
 create-ngp [directory] [--template app|app-ssr] [--overwrite] [--no-interactive]
