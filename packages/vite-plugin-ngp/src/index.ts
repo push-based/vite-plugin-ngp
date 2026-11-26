@@ -143,6 +143,14 @@ export interface NgpPluginOptions {
    */
   cache?: boolean | {dir?: string};
   /**
+   * The root of the workspace this project is one of, absolute or relative to Vite's `root`. ngp
+   * then writes paths in compiled code relative to it, not to the folder that holds the tsconfig:
+   * the file in a class's debug info and in a component's HMR id. A module then compiles to the
+   * same code whichever project asks for it, and projects that also share `cache.dir` and have
+   * the same compiler options compile it once between them. Default: the tsconfig's folder.
+   */
+  workspaceRoot?: string;
+  /**
    * Test-only behaviour, for specs written for TestBed under JIT. Applies under Vitest only, and
    * is ignored in the dev server and in builds, so it can sit in a Vite config both share. Off by
    * default: without it, specs compile exactly like the app.
@@ -351,6 +359,9 @@ function compilerPlugin(
   if (cacheDirOption !== undefined && (typeof cacheDirOption !== 'string' || cacheDirOption.trim() === '')) {
     throw new Error(`[vite-plugin-ngp] cache.dir must be a path, not ${JSON.stringify(cacheDirOption)}`);
   }
+  if (options.workspaceRoot !== undefined && (typeof options.workspaceRoot !== 'string' || options.workspaceRoot.trim() === '')) {
+    throw new Error(`[vite-plugin-ngp] workspaceRoot must be a path, not ${JSON.stringify(options.workspaceRoot)}`);
+  }
   let checker: TypeChecker | null = null;
   let devCheck: ReturnType<typeof startDevTypeCheck> | null = null;
   /** Requests and compiles in flight: the first type-check waits until there are none. */
@@ -477,6 +488,7 @@ function compilerPlugin(
         toolchainDir,
         engine,
         tsconfig,
+        rootDir: options.workspaceRoot === undefined ? undefined : path.resolve(config.root, options.workspaceRoot),
         analyzerTsconfig,
         enableHmr: hmr && consumer === 'client',
         fileReplacements: replacements.byFile,

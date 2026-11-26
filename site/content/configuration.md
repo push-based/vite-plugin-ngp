@@ -49,6 +49,7 @@ export default defineConfig({
 | `budgets` | `Budget[]`<br>Default `[]` | angular.json's `budgets`: size limits checked after `vite build`, with the CLI's types and messages. An error budget fails the build. |
 | `polyfills` | `string[]`<br>Default `[]` | angular.json's `polyfills`: packages or files imported before your app. `zone.js` also makes the plugin rewrite `async`/`await` so zone.js can track it. |
 | `cache` | `boolean \| {dir?: string}`<br>Default `true` | Keep compiled output between runs. `vite build` and Vitest then skip ngp's code generation, the linker and the build optimizer for every module whose inputs are unchanged. `true` keeps it under Vite's `cacheDir`, and `{dir: 'path'}` in a directory you name, which the projects of a workspace can share. The dev server never uses it. See [Reusing output between builds](how-it-works#reusing-output-between-builds). |
+| `workspaceRoot` | `string`<br>Default: the folder of your tsconfig | The root of the workspace this project is one of, absolute or relative to Vite's root. ngp then writes paths in compiled code from there, so a module compiles to the same code in every project, and projects on one `cache.dir` with the same compiler options compile it once between them. See [Sharing one directory between projects](how-it-works#sharing-one-directory-between-projects). |
 | `test` | `TestOptions`<br>Default: every switch off | Switches for specs written for TestBed under JIT. They apply under Vitest only, so the option can sit in a Vite config your builds share. `jitCompat` makes specs see what JIT TestBed saw: NgModule scopes for `TestBed.override*`, and `@defer` dependencies as static imports, so class metadata is there without `compileComponents()`. `extendedDiagnostics: 'warning'` reports Angular's extended diagnostics as warnings in specs, whatever your tsconfig sets. `runtimeScopes` drops the template scope errors TestBed resolves at runtime, for non-standalone and spec-declared components only. See [Specs written for JIT](testing#specs-written-for-jit). |
 
 ## When to change them
@@ -73,7 +74,18 @@ ngp({cache: {dir: path.join(workspaceRoot, 'node_modules/.cache/vite-plugin-ngp'
 
 Give the cache a folder of its own. The plugin refuses a `dir` that is Vite's root or a folder the root is in, such as the workspace root itself, because the entries would land among your sources.
 
-Only library code is shared. Your own compiled modules stay per project even in one directory, because their key holds the tsconfig they compile with and its folder. Projects pointed at the very same tsconfig file do share them, which is safe: same file, same options, same output. And it saves less than it sounds: about a tenth of a second for a project Vitest has never run, in the one case measured. [Sharing one directory between projects](how-it-works#sharing-one-directory-between-projects) has the numbers and what the option leaves on the table.
+On its own this shares library code only. Your own compiled modules stay per project, because ngp writes paths from the folder of each project's tsconfig into them. `workspaceRoot`, below, is what lets projects share those too. And the linking alone saves less than it sounds: about a tenth of a second for a project Vitest has never run, in the one case measured. [Sharing one directory between projects](how-it-works#sharing-one-directory-between-projects) has the numbers and what the option leaves on the table.
+
+**`workspaceRoot`** is for the same workspace, next to `cache: {dir}`. By default ngp writes a class's file into its debug info, and a component's file into its HMR id, as a path from the folder that holds the project's tsconfig. A library file that two projects import then compiles to different code in each, so each compiles it for itself. With `workspaceRoot` those paths start at the workspace root, in every project:
+
+```ts
+ngp({
+  workspaceRoot,
+  cache: {dir: path.join(workspaceRoot, 'node_modules/.cache/vite-plugin-ngp')},
+})
+```
+
+Two projects then share a compiled module when their compiler options are the same, apart from where each tsconfig sits and where `tsc` would write. Template checks count as options: a project with `strictTemplates` and one without don't share, because an entry holds the module's diagnostics too. Set it in every project of the workspace or in none, since it changes the paths in the code. It has no effect on a project that stands alone, beyond those paths.
 
 **`typeCheck: false`** skips the check in the dev server and in builds. Use it if you already run `tsc` or `ng build` in CI and the dev-server check is too slow on your app, or if your `cacheDir` is outside the project. Builds then succeed with type errors in them.
 

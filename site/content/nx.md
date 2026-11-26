@@ -117,17 +117,18 @@ A workspace that runs Vitest per project gets one output cache per project: Vite
 
 ```ts title="apps/client/vite.config.mts"
 ngp({
+  workspaceRoot: workspace,
   cache: {dir: path.join(workspace, 'node_modules/.cache/vite-plugin-ngp')},
 }),
 ```
 
 Use an absolute path from the workspace root, as here. A relative one resolves from Vite's root, which is each project's own folder. Put it in the preset your projects' configs share, if you have one.
 
-What's shared is library code: a library one project linked is read by the next. Each project still compiles your own libraries under `libs/` for itself, because a compiled module's key holds the tsconfig it compiles with and that tsconfig's folder, and every project in an Nx workspace has its own `tsconfig.spec.json`. [Issue #61](https://github.com/push-based/vite-plugin-ngp/issues/61) is the plan for that part.
+`cache.dir` shares library code: a library one project linked is read by the next. `workspaceRoot` shares your own libraries under `libs/`. Every project in an Nx workspace has its own `tsconfig.spec.json`, and by default ngp writes paths into compiled code from that file's folder, so `libs/ui/src/button.ts` compiles to different code in each project that imports it. With `workspaceRoot` the paths start at the workspace root, and projects whose compiler options are the same read each other's compiled modules. "The same" leaves out where each tsconfig is and its `outDir`, and includes the template checks. So keep `strictTemplates` and the other `angularCompilerOptions` in `tsconfig.base.json`: projects that override one compile for themselves. Set `workspaceRoot` in every project or in none.
 
 The directory isn't a task output. Every project's test target writes to it, so leave it out of `outputs` in `project.json`, and restore it in CI the way you restore `node_modules`. It works within one checkout on one machine: keys hold absolute paths, so it can't go through Nx's remote cache to a machine that checked the repo out somewhere else.
 
-This wasn't run in an Nx workspace. The repo's test uses two plain Vite roots that share a directory. [Sharing one directory between projects](how-it-works#sharing-one-directory-between-projects) has what it measured, which is a small saving: about 0.1 s per project that Vitest hasn't run before.
+This wasn't run in an Nx workspace. The repo's test uses two plain Vite roots that share a directory. [Sharing one directory between projects](how-it-works#sharing-one-directory-between-projects) has what it measured for linked libraries, which is a small saving: about 0.1 s per project that Vitest hasn't run before. What sharing compiled modules saves on a real workspace wasn't measured.
 
 ## What Ghostfolio needed
 
