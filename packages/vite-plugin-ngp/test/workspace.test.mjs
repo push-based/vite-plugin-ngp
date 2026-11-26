@@ -11,7 +11,7 @@ import * as path from 'node:path';
 import {test} from 'node:test';
 import {promisify} from 'node:util';
 import {withoutLocation} from '../dist/compiler.js';
-import {copyFixture, toolchain} from './fixture.mjs';
+import {build, copyFixture, readOutput, recordingLogger, toolchain} from './fixture.mjs';
 
 const vitestBin = path.join(path.dirname(createRequire(import.meta.url).resolve('vitest/package.json')), 'vitest.mjs');
 
@@ -104,4 +104,21 @@ test('workspaceRoot has to be a path', async () => {
   for (const workspaceRoot of ['', ' ', 3, null]) {
     assert.throws(() => ngp({toolchain, workspaceRoot}), /workspaceRoot must be a path/, JSON.stringify(workspaceRoot));
   }
+});
+
+test('a production build is the same with workspaceRoot, and the type-check still finds a template error', async () => {
+  const root = await copyFixture('ng-build-app', 'workspace-root');
+  const output = async () => (await readOutput(path.join(root, 'dist'))).sort((x, y) => x.name.localeCompare(y.name));
+
+  await build(root, {cache: false});
+  const plain = await output();
+  // The paths ngp writes from the root are in debug info and HMR ids, and a build has neither.
+  await build(root, {cache: false, workspaceRoot: '..'});
+  assert.deepEqual(await output(), plain);
+
+  // The type-check blocks import the app's sources by path: a root above the app must not move them.
+  const app = path.join(root, 'src/app.ts');
+  await fs.writeFile(app, (await fs.readFile(app, 'utf8')).replace('{{ status }}', '{{ statu }}'));
+  const {logger} = recordingLogger();
+  await assert.rejects(build(root, {cache: false, workspaceRoot: '..'}, {logger}), /src\/app\.ts[\s\S]*Property 'statu' does not exist/);
 });
