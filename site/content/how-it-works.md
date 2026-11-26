@@ -73,7 +73,7 @@ Angular libraries, Angular's own packages included, ship partially compiled: `ɵ
 
 - In development, inside Vite's dependency pre-bundling, which runs outside the normal plugin pipeline. With `ssr`, the server's libraries are pre-bundled too, into `node_modules/.vite/deps_ssr`; see [Server rendering](server-rendering#what-the-plugin-does). A server environment another plugin adds, like a Cloudflare Worker's, gets the linker in its own pre-bundling. A library the dev server serves without pre-bundling is linked in the normal transform, under the `?v=` query Vite adds to its URL.
 - In production builds and server bundles, in the normal transform. On the server, the plugin bundles every Angular library it finds in your `dependencies`, so the linker sees them too.
-- Under Vitest, in the normal transform. The plugin has Vitest inline every Angular library instead of leaving it to Node, so the linker sees them. See [Testing with Vitest](testing).
+- Under Vitest, in the normal transform. The plugin has Vitest inline every Angular library instead of leaving it to Node, so the linker sees them. With `test.externalLibraries` they stay with Node, and a Node module hook links each one as it loads, from the same cache entries. See [Testing with Vitest](testing#libraries-left-to-node).
 
 Without a linker, the browser would need Angular's JIT compiler to finish compiling libraries at startup. In the playground, linking cut the production bundle from 1,197 kB to 589 kB.
 
@@ -87,11 +87,13 @@ The plugin defines the same globals the Angular CLI does, so the minifier can dr
 
 | Global | Value |
 |---|---|
-| `ngJitMode` | `false` everywhere, since the linker makes every library ahead-of-time compiled |
+| `ngJitMode` | `false` everywhere, since the linker makes every library ahead-of-time compiled. `true` under Vitest with `test.jitCompat` |
 | `ngDevMode` | `false` in builds |
 | `ngServerMode` | `false` in the browser, `true` in server environments |
 | `ngHmrMode` | `true` in the dev server's browser environment, `false` in builds, server environments, under Vitest and with `hmr: false` |
 | `ngI18nClosureMode` | `false` everywhere, so i18n messages compile to `$localize` calls, never Closure's `goog.getMsg` |
+
+Under Vitest with [`test.externalLibraries`](testing#libraries-left-to-node), Angular's libraries don't go through Vite, so `ngJitMode` and `ngServerMode` are set on `globalThis` for them, to the same values.
 
 These took the playground's bundle from 589 kB to 386 kB, and stopped production builds from logging "Angular is running in development mode".
 
@@ -180,4 +182,4 @@ What it saves, on an M4 Max on 26 November 2026: three specs of the plugin's own
 | For comparison: the same project again, Vitest's own cache warm | 0.48–0.49 s |
 | The same project with only Vitest's cache emptied, 4 runs | 1.06–1.10 s |
 
-Where it's weak: that's about 0.1 s of the roughly 0.75 s a project's first run costs over its second. Linking isn't most of it. The last row shows where the rest goes: with everything the plugin keeps still in place, the project's own compiled modules too, emptying Vitest's cache alone costs about 0.6 s. That's Vitest's own work on every inlined library, `@angular/core` included, which never needs linking, and Vitest keeps the result per project. The plugin can't share that part. What sharing compiled modules saves wasn't measured: the fixture has one shared component, and compiling cost 2–20 ms a module in the playground. Projects whose template checks differ still compile for themselves; reporting a module's diagnostics apart from its code would lift that, and is open in [issue #61](https://github.com/push-based/vite-plugin-ngp/issues/61). The analyzer still reads every file a run reaches, in every project. The directory only works within one checkout on one machine, since keys hold absolute paths. Nothing prunes it, and now every project adds to it. Its entries are code your builds and tests run, so whoever can write to the directory can change that code: keep it where only your own builds write, as you do `node_modules`. And when many projects start cold at once, each links the same libraries before any has written them: wasted work, not wrong output.
+Where it's weak: that's about 0.1 s of the roughly 0.75 s a project's first run costs over its second. Linking isn't most of it. The last row shows where the rest goes: with everything the plugin keeps still in place, the project's own compiled modules too, emptying Vitest's cache alone costs about 0.6 s. That's Vitest's own work on every inlined library, `@angular/core` included, which never needs linking, and Vitest keeps the result per project. The plugin can't share that part. It can keep the libraries away from Vitest, though: with [`test.externalLibraries`](testing#libraries-left-to-node) Node loads them and a hook links them from this same directory, and a project Vitest has never run then took 0.34–0.39 s on the same fixture. What sharing compiled modules saves wasn't measured: the fixture has one shared component, and compiling cost 2–20 ms a module in the playground. Projects whose template checks differ still compile for themselves; reporting a module's diagnostics apart from its code would lift that, and is open in [issue #61](https://github.com/push-based/vite-plugin-ngp/issues/61). The analyzer still reads every file a run reaches, in every project. The directory only works within one checkout on one machine, since keys hold absolute paths. Nothing prunes it, and now every project adds to it. Its entries are code your builds and tests run, so whoever can write to the directory can change that code: keep it where only your own builds write, as you do `node_modules`. And when many projects start cold at once, each links the same libraries before any has written them: wasted work, not wrong output.

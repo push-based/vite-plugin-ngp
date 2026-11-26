@@ -920,3 +920,31 @@ The key leaves options out by name, and keeps everything else. The other way rou
 
 **Revisit when** diagnostics are kept apart from the code, keyed on the checks, so projects that differ only in checks share the code; when a project should stop reporting diagnostics for files it doesn't own, which is the question left open in #61; or when a real workspace is measured.
 
+## 76. Under Vitest, let Node load Angular's libraries and link them in a module hook, behind a switch
+
+*26 November 2026*
+
+**Decision.** `test.externalLibraries` stops the plugin from having Vitest inline Angular's libraries. They stay external, Node loads them, and a hook registered with `module.registerHooks` swaps each partially compiled module's source for its linked code as it loads ([link-hook.ts](../packages/vite-plugin-ngp/src/link-hook.ts)). The hook reads and writes the output cache under the key the linker transform uses. A setup file the plugin writes into Vite's `cacheDir` registers it, added ahead of the project's own setup files from the `configureVitest` hook. Off by default ([issue #64](https://github.com/push-based/vite-plugin-ngp/issues/64), part of [#61](https://github.com/push-based/vite-plugin-ngp/issues/61)).
+
+**Why.** [Decision 74](#74-share-the-output-cache-by-naming-its-directory-and-leave-every-key-alone) measured where a new project's time goes: about 0.6 s of 0.75 s was Vitest transforming every inlined library for its module runner, which it caches per project, with the project's root and config files in a key no plugin can change. That's the part the workspace behind [#27](https://github.com/push-based/vite-plugin-ngp/issues/27) patched Vitest for. The plugin can't share that work, but it can make it unnecessary: a library Vitest never inlines is never transformed. What inlining was for is linking and one copy of `@angular/core`. Node gives one copy, since every import of a package resolves to the same file. A load hook gives linking.
+
+Measured on an M4 Max on 26 November 2026, three specs of `test/fixtures/vitest-specs`, five runs of each case, both columns in one session, every project on one `cache.dir`:
+
+| | Inlined | `externalLibraries` |
+|---|---:|---:|
+| First project, empty directory | 1.11–1.16 s | 0.63–0.64 s |
+| A second project Vitest has never run | 1.05–1.13 s | 0.34–0.39 s |
+| That project again | 0.45–0.50 s | 0.30–0.34 s |
+
+The alternatives were a linked copy of each package on disk, with imports redirected to it, and linking ahead of the run. A copy needs a `node_modules` tree around it so the copies find each other and their own dependencies, which under pnpm means rebuilding each package's links: a package manager's job. Linking ahead needs the list of files a run will load, which nobody has before it runs. The hook links what's loaded, where it's loaded from.
+
+`registerHooks` and not `module.register`: it runs in the thread that calls it, synchronously, for `import` and `require`, which is where Vitest's runner imports externals. It has to answer at once, so the cache got a synchronous `reuseSync`, and on a miss the hook loads the linker with `require`, which Node 26 allows for an ES module.
+
+Three things had to line up with the inlined path. The key: Vite blanks a module's trailing source map comment before a transform sees it, and Node hands the file over as it is, so both paths now start from the text with that comment blanked (`withoutSourceMapComment`), or the two would never find each other's entries. The globals: `ngJitMode` and `ngServerMode` are compile-time defines for code that goes through Vite, so the setup file sets them on `globalThis` for code that doesn't. And re-entry: `@angular/compiler-cli` names every `ɵɵngDeclare` function, so it carries the marker itself, and its modules come through the hook while the hook is loading the linker; they pass untouched.
+
+It also settles half of [#56](https://github.com/push-based/vite-plugin-ngp/issues/56) for whoever turns it on: projects that share the root config's server never got the inline list, so their libraries were loaded unlinked. The setup file is added per project. In the playground's `server` and `jsdom` projects `CommonModule` comes out linked with the switch, and all 33 specs pass.
+
+**Cost.** `vi.mock` reaches a library only where the app's own code imports it, as for any external; an import between libraries isn't mocked. vm pools are refused: they load externals themselves. A worker that misses loads `@angular/compiler-cli` and Vite's parser, about 0.2 s once per worker, until the cache has the library. With `cache: false` every worker links what it loads. `ngServerMode` is set from whether a `document` exists when the setup file runs, which is right for Vitest's `node` and DOM environments and a guess for anything else. The linker transform's key changed with the blanked comment, so every linked library misses once. And the hook sees every module Node loads in a worker after it's registered: it looks for the marker in each one's bytes, which wasn't timed on its own.
+
+**Revisit when** a real workspace has run it, to decide whether it should be the default under Vitest, which would also close #56; when Vitest offers a cache key without the project, which would make the inlined path as cheap; or when a spec needs `vi.mock` between libraries.
+

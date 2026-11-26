@@ -2,6 +2,7 @@ import {ConsoleLogger, LogLevel, NodeJSFileSystem, type AbsoluteFsPath} from '@a
 import {FileLinker, LinkerEnvironment, type DeclarationScope} from '@angular/compiler-cli/linker';
 import MagicString from 'magic-string';
 import {parseSync} from 'vite';
+import {LINKER_MARKER, NEVER_LINKED} from './linker-filter.js';
 import {OxcAstHost, StringAstFactory, type Expression, type Node} from './linker-oxc.js';
 
 /**
@@ -17,10 +18,7 @@ import {OxcAstHost, StringAstFactory, type Expression, type Node} from './linker
  * text with each `ɵɵngDeclare` call swapped for its definition. That's the CLI's current design
  * (angular/angular-cli#33625), ported here because it's private to `@angular/build`.
  */
-export const LINKER_MARKER = 'ɵɵngDeclare';
-
-/** Angular's compiler and core define the ɵɵngDeclare functions but never need linking. */
-const NEVER_LINKED = /[\\/]@angular[\\/](?:compiler|core)[\\/]/;
+export {LINKER_MARKER};
 
 /**
  * Keeps each declaration's constants, like its parsed template, in an IIFE around the definition
