@@ -196,6 +196,8 @@ Where it's weak:
 - **Browser mode ignores it.** Vite pre-bundles the libraries for the browser, linked, as in the dev server.
 - **A worker that misses loads the linker.** That's about 0.2 s, once per worker, for the first project to meet a library. After that every worker reads the cache. With `cache: false` every worker links what it loads, on every run.
 - **It's measured on one small fixture,** not on a workspace with hundreds of projects, and the playground's three projects are the only other thing it has run on.
+- **Your own code that isn't Angular still goes through Vitest once per project.** A plain TypeScript file, a utility or a service with no decorator, is transformed by Vite and kept in Vitest's cache, which is per project. That's the cheap part of a run, since it's only type-stripping, but a cache that Vitest shared between projects would save it and this doesn't.
+- **A library has to load in Node as it is.** Left to Node, a library's own imports are resolved by Node, not by Vite. One that only works after Vite has resolved or transformed something in it, an alias or a CSS import, has to stay inlined, and then the switch is the wrong tool for that project.
 
 ## Domino's gaps
 
