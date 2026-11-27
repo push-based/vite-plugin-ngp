@@ -75,3 +75,14 @@ test('an analyzer with no entries compiles every playground module identically',
     assert.equal(onDemand.get(file), full.get(file), path.relative(playground, file));
   }
 });
+
+// In a dev server that renders pages, the browser's and the server's compiler are created
+// together and write the same file.
+test('two writers of the same tsconfig at once both get it', async () => {
+  const outDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vite-plugin-ngp-'));
+  const options = {tsconfig: path.join(playground, 'tsconfig.app.json'), entries: [path.join(playground, 'src/main.ts')], outDir};
+  const files = await Promise.all(Array.from({length: 8}, () => writeEntryTsconfig(options)));
+  assert.equal(new Set(files).size, 1, 'one file, named by its content');
+  assert.deepEqual(JSON.parse(await fs.readFile(files[0], 'utf8')).files, options.entries);
+  assert.deepEqual(await fs.readdir(outDir), [path.basename(files[0])], 'no partial file is left behind');
+});

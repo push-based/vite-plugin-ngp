@@ -1,4 +1,4 @@
-import {createHash} from 'node:crypto';
+import {createHash, randomUUID} from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
@@ -29,7 +29,10 @@ export async function writeEntryTsconfig(options: {
   const hash = createHash('sha256').update(json).digest('hex').slice(0, 8);
   const file = path.join(options.outDir, `tsconfig.entry.${hash}.json`);
   await fs.mkdir(options.outDir, {recursive: true});
-  const partial = `${file}.${process.pid}.tmp`;
+  // A name of its own for every write. The browser's and the server's compiler are created at
+  // the same time in a dev server that renders pages, with the same entries: named by process
+  // alone, both wrote one partial file, and the second to move it found it gone.
+  const partial = `${file}.${randomUUID()}.tmp`;
   await fs.writeFile(partial, json);
   await fs.rename(partial, file);
   return file;
