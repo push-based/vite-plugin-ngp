@@ -1,3 +1,14 @@
+## 0.4.3 (2026-11-27)
+
+### 🩹 Fixes
+
+- **vite-plugin-ngp:** write the entry tsconfig through a temporary file of its own ([#70](https://github.com/push-based/vite-plugin-ngp/pull/70))
+- **vite-plugin-ngp:** add the event dispatch contract to the server's document ([#69](https://github.com/push-based/vite-plugin-ngp/pull/69), [#68](https://github.com/push-based/vite-plugin-ngp/issues/68))
+
+### ❤️ Thank You
+
+- Christopher Holder @ChristopherPHolder
+
 ## 0.4.2 (2026-11-26)
 
 ### 🚀 Features

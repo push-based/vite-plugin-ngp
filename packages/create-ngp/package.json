@@ -3,7 +3,7 @@
   "nx": {
     "name": "create-ngp"
   },
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Scaffold an Angular app built by vite-plugin-ngp: npm create @push-based/ngp, or vp create @push-based/ngp",
   "license": "MIT",
   "author": "PushBased",
