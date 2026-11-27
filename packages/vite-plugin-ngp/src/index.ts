@@ -26,7 +26,8 @@ import {
 import {budgetsPlugin, type Budget} from './budgets.js';
 import {NgpCompiler, type ComponentStyle, type HmrUpdate, type TransformResult} from './compiler.js';
 import {writeEntryTsconfig} from './entry-tsconfig.js';
-import {i18nPlugin, type I18nOptions} from './i18n.js';
+import {addEventDispatchContract, serverTemplatePlugin} from './event-dispatch.js';
+import {i18nPlugin, type I18nApi, type I18nOptions} from './i18n.js';
 import {EXTENDED_DIAGNOSTIC_CODES} from './extended-diagnostics.js';
 import {link, LINKER_MARKER} from './linker.js';
 import {linkerKey, withoutSourceMapComment} from './linker-filter.js';
@@ -92,8 +93,9 @@ export interface NgpPluginOptions {
    * `AngularNodeAppEngine`, server routes set each route's render mode, and `vite build`
    * prerenders the routes that ask for it. Without `@angular/ssr`, the entry default-exports
    * `render(url: string, document: string): Promise<string>`, which turns index.html into the
-   * rendered page, and the app serves the build itself. Either way the dev server renders every
-   * page request.
+   * rendered page, and the app serves the build itself, passing `render` the build's
+   * `server/index.server.html`: index.html plus the script `withEventReplay()` needs. Either way
+   * the dev server renders every page request.
    */
   ssr?: boolean | SsrOptions;
   /**
@@ -302,6 +304,7 @@ export function ngp(options: NgpPluginOptions = {}): Plugin[] {
   // With i18n, the plugin loads `$localize` itself in dev, and builds translate it away, so a
   // `@angular/localize` polyfill is dropped, as the CLI drops it when it inlines translations.
   const polyfills = (options.polyfills ?? []).filter((p) => !(options.i18n && p.startsWith('@angular/localize')));
+  const i18n = options.i18n ? i18nPlugin(options.i18n, () => compiler.api.entries(), !!options.ssr && !isVitest()) : null;
   return [
     compiler,
     ...(options.fileReplacements?.length ? [fileReplacementsPlugin(options.fileReplacements, replacements)] : []),
@@ -312,9 +315,15 @@ export function ngp(options: NgpPluginOptions = {}): Plugin[] {
     optimizerPlugin(compiler.api),
     ...(polyfills.length > 0 ? [polyfillsPlugin(polyfills, () => compiler.api.entries())] : []),
     ...(usesZone(polyfills) ? [zoneAsyncPlugin()] : []),
-    ...(options.i18n ? [i18nPlugin(options.i18n, () => compiler.api.entries(), !!options.ssr && !isVitest())] : []),
+    ...(i18n ? [i18n] : []),
     ...(options.ssr && !isVitest()
-      ? [angularSsrPlugin(() => compiler.api.angularSsr(), ssrOptionsOf(options)?.allowedHosts ?? ['localhost'], () => polyfills)]
+      ? [
+          angularSsrPlugin(() => compiler.api.angularSsr(), ssrOptionsOf(options)?.allowedHosts ?? ['localhost'], () => polyfills),
+          serverTemplatePlugin(
+            () => !compiler.api.angularSsr(),
+            () => (i18n?.api as I18nApi | undefined)?.folders() ?? [''],
+          ),
+        ]
       : []),
   ];
 }
@@ -874,7 +883,8 @@ function compilerPlugin(
               throw new Error('the ssr environment has no module runner');
             }
             const template = await fs.promises.readFile(path.join(config.root, cleanId(req.url!)), 'utf8');
-            const document = await server.transformIndexHtml(url, template, req.originalUrl);
+            // After Vite's transform, so the contract reaches Angular as its own build wrote it.
+            const document = addEventDispatchContract(await server.transformIndexHtml(url, template, req.originalUrl), config.root, config.html?.cspNonce);
             const entry = await environment.runner.import<{default: (url: string, document: string) => Promise<string>}>(ssrEntry);
             const html = await entry.default(url, document);
             res.setHeader('Content-Type', 'text/html');

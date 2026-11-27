@@ -56,10 +56,12 @@ export const EXTRACT_ENV = 'NGP_I18N_EXTRACT';
 
 /**
  * The plugin's view of the i18n options, exposed as `api` so the extractor can read the source
- * locale from a resolved Vite config.
+ * locale from a resolved Vite config, and the build can find each locale's index.html.
  */
 export interface I18nApi {
   sourceLocale: string;
+  /** Each locale's folder below the outDir. Known once Vite's config is read. */
+  folders(): string[];
 }
 
 /**
@@ -98,7 +100,7 @@ export function i18nPlugin(options: I18nOptions, getEntries: (root: string) => s
     return loaded;
   }
 
-  const api: I18nApi = {sourceLocale: source.code};
+  const api: I18nApi = {sourceLocale: source.code, folders: () => locales.map((l) => l.subPath)};
 
   return {
     name: 'vite-plugin-ngp:i18n',

@@ -12,7 +12,8 @@ const client = path.join(site, 'dist/client');
 const base = process.env.SITE_BASE ?? '/vite-plugin-ngp/';
 const siteUrl = (process.env.SITE_ORIGIN ?? 'https://push-based.github.io') + base;
 
-const template = await readFile(path.join(client, 'index.html'), 'utf8');
+// The browser's index.html plus Angular's event dispatch contract, which event replay needs.
+const template = await readFile(path.join(site, 'dist/server/index.server.html'), 'utf8');
 const entry = await import(pathToFileURL(path.join(site, 'dist/server/main.server.js')).href);
 const {default: render, routes} = entry;
 const docs = await Promise.all(entry.docs.map(async (d) => ({...d, doc: await d.load()})));

@@ -1,15 +1,19 @@
 import {Component, input} from '@angular/core';
 import type {Routes} from '@angular/router';
 
-@Component({selector: 'app-home', template: '<p id="page">home</p>'})
-class Home {}
+// Home and User have a listener for event replay to queue; About has none.
+@Component({selector: 'app-home', template: '<p id="page">home</p><button (click)="clicks = clicks + 1">{{ clicks }}</button>'})
+class Home {
+  clicks = 0;
+}
 
 @Component({selector: 'app-about', template: '<p id="page">about</p>'})
 class About {}
 
-@Component({selector: 'app-user', template: '<p id="page">user {{ id() }}</p>'})
+@Component({selector: 'app-user', template: '<p id="page">user {{ id() }}</p><button (click)="clicks = clicks + 1">{{ clicks }}</button>'})
 class User {
   readonly id = input('');
+  clicks = 0;
 }
 
 @Component({selector: 'app-not-found', template: '<p id="page">not found</p>'})

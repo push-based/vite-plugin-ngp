@@ -10,6 +10,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {Worker} from 'node:worker_threads';
 import {isRunnableDevEnvironment, type Connect, type Plugin, type ResolvedConfig, type ViteDevServer} from 'vite';
+import {addEventDispatchContract} from './event-dispatch.js';
 import {polyfillImports} from './polyfills.js';
 
 /** The app's server entry and Node server, as absolute paths. */
@@ -27,6 +28,13 @@ export const SERVER_ID = 'virtual:ngp-ssr/server';
 const APP_MANIFEST_ID = 'virtual:ngp-ssr/app-manifest';
 const ENGINE_MANIFEST_ID = 'virtual:ngp-ssr/engine-manifest';
 const VIRTUAL = /^virtual:ngp-ssr\//;
+
+/**
+ * Starts the dev manifest's `index.server.html`, so the hook that transforms both documents can
+ * tell the one Angular renders into from the one a `Client` route gets as it is. The hook takes
+ * it off again. A comment, so a document that kept it would still be the same page.
+ */
+const SERVER_TEMPLATE_MARK = '<!--ngp:server-template-->';
 
 /** The CLI's file names. Written after the bundle, since they hold the prerendered pages. */
 const APP_MANIFEST_FILE = 'angular-app-manifest.mjs';
@@ -164,10 +172,11 @@ export function angularSsrPlugin(getFiles: () => AngularSsrFiles | null, allowed
               set,
               `import { readFile } from 'node:fs/promises';`,
               `const index = { hash: '', size: 0, text: () => readFile(${index}, 'utf8') };`,
+              `const server = { ...index, text: async () => ${JSON.stringify(SERVER_TEMPLATE_MARK)} + (await index.text()) };`,
               `ɵsetAngularAppManifest({`,
               `  baseHref: ${JSON.stringify(baseHrefOf(config.base))},`,
               `  bootstrap: () => import(${mainServer}).then((m) => m.default),`,
-              `  assets: { 'index.server.html': index, 'index.csr.html': index },`,
+              `  assets: { 'index.server.html': server, 'index.csr.html': index },`,
               `});`,
             ].join('\n');
           }
@@ -210,8 +219,10 @@ export function angularSsrPlugin(getFiles: () => AngularSsrFiles | null, allowed
       }
       const baseHref = baseHrefOf(config.base);
       const shell = await fs.promises.readFile(indexFile, 'utf8');
+      // Only the document Angular renders into gets the event dispatch contract. A `Client` route
+      // is answered with the other one, which has nothing to replay.
       const assets = new Map([
-        ['index.server.html', shell],
+        ['index.server.html', addEventDispatchContract(shell, config.root, config.html?.cspNonce)],
         ['index.csr.html', shell],
       ]);
       await fs.promises.writeFile(
@@ -340,7 +351,13 @@ export function angularSsrDevMiddleware(server: ViteDevServer, files: AngularSsr
       stale = true;
     });
   }
-  const transform = ({html, url}: {html: string; url: URL}) => server.transformIndexHtml(url.pathname, html, url.pathname + url.search);
+  // Both of the manifest's documents come through here. The contract goes into the one Angular
+  // renders into, after Vite's transform, so it reaches Angular as its own build wrote it.
+  const transform = async ({html, url}: {html: string; url: URL}) => {
+    const rendered = html.startsWith(SERVER_TEMPLATE_MARK);
+    const page = await server.transformIndexHtml(url.pathname, rendered ? html.slice(SERVER_TEMPLATE_MARK.length) : html, url.pathname + url.search);
+    return rendered ? addEventDispatchContract(page, server.config.root, server.config.html?.cspNonce) : page;
+  };
   let hookedApp: AngularServerApp | null = null;
   let hookedEngine: ServerExports['AngularAppEngine'] | null = null;
   let warned = false;
