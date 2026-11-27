@@ -31,8 +31,13 @@ function contractOf(root: string): string | null {
   return contract;
 }
 
+/** A start tag with quoted attribute values read as such, so a `>` inside one doesn't end it. */
 const BODY = /<body(?:\s(?:"[^"]*"|'[^']*'|[^>"'])*)?>/i;
-const NG_CSP_NONCE = /\sngCspNonce\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+/** For a tag the first can't read, such as one with a stray quote in an unquoted value. */
+const BODY_LOOSE = /<body\b[^>]*>/i;
+const NG_CSP_NONCE = /<[a-z][^>]*?\sngCspNonce\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
+/** Comments, and elements whose content is text, not markup. */
+const NOT_MARKUP = /<!--[\s\S]*?-->|<(script|style|title|textarea)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
 
 /**
  * `html` with the event dispatch contract in a script right after `<body>`, where the CLI puts
@@ -42,21 +47,32 @@ const NG_CSP_NONCE = /\sngCspNonce\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
  */
 export function addEventDispatchContract(html: string, root: string, cspNonce?: string): string {
   const contract = contractOf(root);
-  const body = contract === null || html.includes(CONTRACT_ID) ? null : BODY.exec(html);
+  if (contract === null || html.includes(CONTRACT_ID)) {
+    return html;
+  }
+  // Blanked at the same offsets, so a `<body>` in a comment, a title or a script's string isn't
+  // taken for the tag.
+  const markup = html.replace(NOT_MARKUP, (text) => ' '.repeat(text.length));
+  const body = BODY.exec(markup) ?? BODY_LOOSE.exec(markup);
   if (!body) {
     return html;
   }
-  const match = NG_CSP_NONCE.exec(html);
-  const nonce = match ? (match[1] ?? match[2] ?? match[3]) : cspNonce;
-  const attribute = nonce ? ` nonce="${nonce.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"` : '';
+  const match = NG_CSP_NONCE.exec(markup);
+  // The attribute's value is HTML already, and only a quote could end the new attribute early.
+  const written = (match?.[1] ?? match?.[2] ?? match?.[3] ?? '').replace(/"/g, '&quot;');
+  const nonce = written || (cspNonce ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;');
   const at = body.index + body[0].length;
-  return `${html.slice(0, at)}<script type="text/javascript" id="${CONTRACT_ID}"${attribute}>${contract}</script>${html.slice(at)}`;
+  return `${html.slice(0, at)}<script type="text/javascript" id="${CONTRACT_ID}"${nonce ? ` nonce="${nonce}"` : ''}>${contract}</script>${html.slice(at)}`;
 }
 
 /**
  * For a `render(url, document)` server entry: `vite build` writes `index.server.html` next to each
  * `main.server.js`, the browser build's index.html with the contract. The browser's own index.html
  * stays without it: a page nobody rendered on the server has nothing to replay.
+ *
+ * Written after each of the two builds, from the index.html on disk. The server build empties its
+ * folder, so it writes the file again, and in `vite build --watch` an edit that only rebuilds the
+ * browser bundle would otherwise leave the file naming chunks that are gone.
  *
  * @param enabled Whether the app renders with `render`, not `@angular/ssr`, which has its manifest.
  * @param folders The folders of the build that hold an index.html: one per locale, else the root.
@@ -68,21 +84,24 @@ export function serverTemplatePlugin(enabled: () => boolean, folders: () => stri
     configResolved(resolved) {
       config = resolved;
     },
-    async writeBundle(output) {
-      if (!enabled() || config.command !== 'build' || this.environment.name !== 'ssr' || !output.dir) {
+    async writeBundle() {
+      const name = this.environment.name;
+      if (!enabled() || config.command !== 'build' || (name !== 'client' && name !== 'ssr')) {
         return;
       }
-      const clientConfig = this.environment.getTopLevelConfig().environments['client'];
-      const clientDir = path.resolve(config.root, clientConfig?.build.outDir ?? config.build.outDir);
+      const environments = this.environment.getTopLevelConfig().environments;
+      const outDir = (environment: string) => path.resolve(config.root, environments[environment]?.build.outDir ?? config.build.outDir);
+      const clientDir = outDir('client');
+      const serverDir = outDir('ssr');
       for (const folder of folders()) {
         const index = path.join(clientDir, folder, 'index.html');
-        // No browser build, or one without an index.html: nothing to render into.
+        // Not built yet: the browser build writes the file when it has.
         if (!fs.existsSync(index)) {
           continue;
         }
         const html = addEventDispatchContract(await fs.promises.readFile(index, 'utf8'), config.root, config.html?.cspNonce);
-        await fs.promises.mkdir(path.join(output.dir, folder), {recursive: true});
-        await fs.promises.writeFile(path.join(output.dir, folder, SERVER_TEMPLATE_FILE), html);
+        await fs.promises.mkdir(path.join(serverDir, folder), {recursive: true});
+        await fs.promises.writeFile(path.join(serverDir, folder, SERVER_TEMPLATE_FILE), html);
       }
     },
   };

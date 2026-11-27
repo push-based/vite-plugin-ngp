@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import {test} from 'node:test';
 import {pathToFileURL} from 'node:url';
 import {promisify} from 'node:util';
-import {createServer} from 'vite';
+import {createBuilder, createServer} from 'vite';
 import {addEventDispatchContract} from '../dist/event-dispatch.js';
 import {ngp} from '../dist/index.js';
 import {build, copyFixture, toolchain} from './fixture.mjs';
@@ -57,8 +57,9 @@ async function devPage(root) {
     await server.listen();
     const {port} = server.httpServer.address();
     const response = await fetch(`http://127.0.0.1:${port}/`, {headers: {accept: 'text/html'}});
-    assert.equal(response.status, 200);
-    return await response.text();
+    const html = await response.text();
+    assert.equal(response.status, 200, html);
+    return html;
   } finally {
     await server.close();
   }
@@ -76,23 +77,33 @@ async function renderBuilt(entry, template) {
 
 test('the contract script goes right after <body>, with the page nonce', () => {
   const root = path.resolve(import.meta.dirname, 'fixtures/ng-build-app');
-  const page = (body) => `<!doctype html><html><head><title>t</title></head>${body}</html>`;
-  assert.match(addEventDispatchContract(page('<body class="a > b"><app-root></app-root></body>'), root), new RegExp(`<body class="a > b">${CONTRACT.source}<app-root>`));
-  assert.match(
-    addEventDispatchContract(page('<body><app-root ngCspNonce="abc"></app-root></body>'), root, 'vite'),
-    /<body><script type="text\/javascript" id="ng-event-dispatch-contract" nonce="abc">/,
-    'ngCspNonce is the nonce, as in the CLI',
-  );
-  assert.match(
-    addEventDispatchContract(page('<body></body>'), root, 'a"b'),
-    /id="ng-event-dispatch-contract" nonce="a&quot;b">/,
-    "else Vite's html.cspNonce",
-  );
-  const once = addEventDispatchContract(page('<body></body>'), root);
-  assert.equal(addEventDispatchContract(once, root), once, 'a document that has the script is left alone');
-  assert.equal(addEventDispatchContract('<app-root></app-root>', root), '<app-root></app-root>', 'no <body> tag, no script');
-  const elsewhere = path.resolve(import.meta.dirname, '../../../..');
-  assert.equal(addEventDispatchContract(page('<body></body>'), elsewhere), page('<body></body>'), 'no @angular/core to read it from, no script');
+  const page = (body, head = '<title>t</title>') => `<!doctype html><html><head>${head}</head>${body}</html>`;
+  const add = (html, nonce) => addEventDispatchContract(html, root, nonce);
+  assert.match(add(page('<body class="a > b"><app-root></app-root></body>')), new RegExp(`<body class="a > b">${CONTRACT.source}<app-root>`));
+  assert.match(add(page(`<body data-note=it's><app-root></app-root></body>`)), new RegExp(`<body data-note=it's>${CONTRACT.source}<app-root>`), 'a tag with a stray quote');
+
+  // A `<body>` that isn't the tag: in a title, a comment, or a script's string.
+  for (const head of ['<title>The <body> tag</title>', '<!-- <body> -->', '<script>const tag = "<body>";</script>', '<style>/* <body> */</style>']) {
+    const html = add(page('<body><app-root></app-root></body>', head));
+    assert.ok(html.includes(head), `${head} is left as it is`);
+    assert.match(html, new RegExp(`</head><body>${CONTRACT.source}<app-root>`), head);
+  }
+
+  const nonce = (html) => /id="ng-event-dispatch-contract"( nonce="[^"]*")?>/.exec(html)?.[1] ?? null;
+  assert.equal(nonce(add(page('<body><app-root ngCspNonce="abc"></app-root></body>'), 'vite')), ' nonce="abc"', 'ngCspNonce is the nonce, as in the CLI');
+  assert.equal(nonce(add(page('<body><app-root ngCspNonce="a&amp;b"></app-root></body>'))), ' nonce="a&amp;b"', 'copied as written, not escaped twice');
+  assert.equal(nonce(add(page(`<body><app-root ngCspNonce='a"b'></app-root></body>`))), ' nonce="a&quot;b"');
+  assert.equal(nonce(add(page('<body></body>'), 'a"b&c')), ' nonce="a&quot;b&amp;c"', "else Vite's html.cspNonce");
+  assert.equal(nonce(add(page('<body><app-root ngCspNonce=""></app-root></body>'), 'vite')), ' nonce="vite"', 'an empty ngCspNonce is no nonce');
+  assert.equal(nonce(add(page('<body></body>', '<!-- put ngCspNonce="x" on the root -->'))), null, 'ngCspNonce in a comment is no nonce');
+  assert.equal(nonce(add(page('<body></body>'))), null);
+
+  const once = add(page('<body></body>'));
+  assert.equal(add(once), once, 'a document that has the script is left alone');
+  assert.equal(add('<app-root></app-root>'), '<app-root></app-root>', 'no <body> tag, no script');
+  // From the filesystem's root, no @angular/core resolves.
+  const nowhere = path.parse(root).root;
+  assert.equal(addEventDispatchContract(page('<body></body>'), nowhere), page('<body></body>'), 'no @angular/core to read it from, no script');
 });
 
 test('dev: a page with a listener gets the contract and the bootstrap call', async () => {
@@ -116,6 +127,20 @@ test('build: index.server.html has the contract, and the browser index.html does
   assert.doesNotMatch(client, /ng-event-dispatch-contract/);
   assert.match(server, new RegExp(`<body>${CONTRACT.source}`));
   assert.equal(server.replace(CONTRACT, ''), client, 'and is the browser index.html otherwise');
+
+  // The browser build writes it too, so a rebuild of that bundle alone can't leave it stale.
+  await fs.rm(template);
+  const builder = await createBuilder({
+    root,
+    cacheDir: path.join(root, '.vite'),
+    configFile: false,
+    logLevel: 'silent',
+    plugins: ngp({toolchain, ssr: true, typeCheck: false}),
+  });
+  await builder.build(builder.environments.client);
+  const rebuilt = await fs.readFile(template, 'utf8');
+  assert.equal(rebuilt.replace(CONTRACT, ''), await fs.readFile(path.join(root, 'dist/client/index.html'), 'utf8'));
+  assert.match(rebuilt, CONTRACT);
 
   const entry = path.join(root, 'dist/server/main.server.js');
   assert.match(await renderBuilt(entry, template), EVENT_REPLAY, 'rendered into it, the page replays events');

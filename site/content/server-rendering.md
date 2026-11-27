@@ -127,11 +127,11 @@ provideClientHydration(withEventReplay())
 
 `withEventReplay()` queues the clicks a user makes before the app has hydrated, and replays them once it has. It depends on a script at the top of the page, Angular's event dispatch contract, 476 bytes in Angular 22.3.0-rc.0. Angular's server renderer doesn't add that script. It looks for it in the document it renders into: when it's there, the renderer adds a `window.__jsaction_bootstrap(...)` call after it, or takes the script out again if hydration is off or the page has no listeners. When it isn't there, the renderer does nothing and says nothing, and early clicks are lost.
 
-The Angular CLI puts the script in at build time, and so does the plugin: right after `<body>`, read from your app's `@angular/core`, into the document the server renders into. The browser's own `index.html` never gets it, since a page nobody rendered has nothing to replay.
+The Angular CLI puts the script in at build time, and so does the plugin: right after `<body>`, read from your app's `@angular/core`, into the document the server renders into. A page nobody rendered has nothing to replay, so the document a browser gets unrendered stays without it: the built `index.html`, and what a `Client` route answers with.
 
 - **In the dev server**, the plugin adds it after Vite has transformed `index.html`, before `render` or `@angular/ssr` gets the document. You change nothing.
 - **With `@angular/ssr`**, `vite build` adds it to the document in the manifest that pages render into, so prerendered pages and pages rendered on request both replay. A `Client` route is answered with the other document, without it. You change nothing.
-- **With `render`**, `vite build` writes `dist/server/index.server.html`, the built `index.html` plus the script. Pass that file to `render`, where you passed `dist/client/index.html` before:
+- **With `render`**, `vite build` writes `dist/server/index.server.html`, the built `index.html` plus the script, and writes it again whenever either bundle is rebuilt, as in `vite build --watch`. Pass that file to `render`, where you passed `dist/client/index.html` before:
 
 ```ts
 const template = await readFile('dist/server/index.server.html', 'utf8');
@@ -140,7 +140,7 @@ const html = await render(url, template);
 
 A server that still reads `dist/client/index.html` renders as it did, and loses early clicks with no error: that's the one step of this that's on you. With `i18n`, each locale has its own file, such as `dist/server/de/index.server.html`.
 
-If your page has a CSP nonce, the script gets it: the value of an `ngCspNonce` attribute in `index.html`, as in the CLI, else Vite's `html.cspNonce`. The CLI copies the nonce to every other inline script and style too; the plugin only handles the script it adds.
+If your page has a CSP nonce, the script gets it: the value of an `ngCspNonce` attribute in `index.html`, as in the CLI, else Vite's `html.cspNonce`. Angular gives the `__jsaction_bootstrap` call its nonce itself, and reads it from `ngCspNonce` only, so under a strict policy replay needs that attribute, whatever Vite is set to. The CLI copies the nonce to every other inline script and style too; the plugin only handles the script it adds.
 
 Checked on the playground on 27 November 2026, in Chromium, with every script held back until after a click on the Signals page's counter: once the app hydrated the counter read 1, in the dev server and from the build in both locales. With the two scripts cut from the same page it stayed at 0.
 
