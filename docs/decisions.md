@@ -948,3 +948,27 @@ It also settles half of [#56](https://github.com/push-based/vite-plugin-ngp/issu
 
 **Revisit when** a real workspace has run it, to decide whether it should be the default under Vitest, which would also close #56; when Vitest offers a cache key without the project, which would make the inlined path as cheap; or when a spec needs `vi.mock` between libraries.
 
+## 77. Put the event dispatch contract in the server's document only, and write that document for `render`
+
+*27 November 2026*
+
+**Decision.** The plugin adds Angular's event dispatch contract, `@angular/core/event-dispatch-contract.min.js` in a `<script id="ng-event-dispatch-contract">` right after `<body>`, to the document a server renders into, and to nothing else ([event-dispatch.ts](../packages/vite-plugin-ngp/src/event-dispatch.ts), [issue #68](https://github.com/push-based/vite-plugin-ngp/issues/68)). There are four places:
+
+- Dev, `render`: the middleware adds it to `index.html` after `server.transformIndexHtml`.
+- Dev, `@angular/ssr`: the dev manifest's `index.server.html` starts with a marker comment. The `html:transform:pre` hook, which both of the manifest's documents pass through, takes the marker off, runs Vite's transform, and adds the script to the document that had it.
+- Build, `@angular/ssr`: the manifest's `index.server.html` is the built `index.html` with the script, and `index.csr.html` is the built `index.html`.
+- Build, `render`: a `writeBundle` hook writes `<outDir>/server/index.server.html`, per locale with i18n, and the app's server passes that to `render`. It runs after the browser build and after the server build, from the `index.html` on disk: the server build empties its folder, and in `vite build --watch` an edit that rebuilds only the browser bundle would otherwise leave the file naming chunks that are gone.
+
+**Why.** `withEventReplay()` did nothing. `@angular/platform-server` doesn't insert the contract: `insertEventRecordScript` looks for the script by id and adds the `__jsaction_bootstrap` call after it, and returns without a word when it isn't there. The CLI inlines it into the server's index content at build time (`addEventDispatchContractPlugin`, in its `ssrPlugins`), and the plugin replaced that build without that step.
+
+A `transformIndexHtml` hook would have been ten lines, and would have put the script into the browser's `index.html` too. `platform-server` removes the script when hydration is off or the page has no listeners, but nothing removes it from a page no server rendered, so every `Client` route and every app without server rendering would ship a script that waits for a call that never comes. The CLI keeps the two documents apart for the same reason, and its names for them were already in the manifest the plugin writes.
+
+After Vite's transform, not before: Vite's HTML pipeline is other plugins' code, and the script should reach Angular as Angular's build wrote it. That's what the marker in dev is for. `@angular/ssr` runs `html:transform:pre` on `index.csr.html` as well, with nothing in the hook's context to say which document it got.
+
+For `render`, the plugin doesn't own the server, so it can't pass the document itself. Wrapping the entry's default export to add the script inside `render` would have needed no change from the app, but it would rewrite a document the app chose to pass, inside a function the app wrote, and put the contract in the server bundle. A file is the CLI's shape (`index.server.html` in the server folder), it's inspectable, and it's what a prerender script already reads.
+
+The nonce: the CLI's `addNoncePlugin` runs after the contract is added and copies the `ngCspNonce` value to every inline script. The plugin gives its own script that value, else Vite's `html.cspNonce`, since it runs after the hook where Vite would have added it. Angular's `CSP_NONCE` reads `ngCspNonce` and nothing else, so the bootstrap call it adds has a nonce only with that attribute.
+
+**Cost.** An app on `render` has to change the path it reads, and one that doesn't keeps losing early clicks without an error; only the changelog and the docs say so. The `<body>` tag is found with a regular expression, not a parser. Comments and the contents of `script`, `style`, `title` and `textarea` are blanked first, so a `<body>` written in one of those isn't taken for the tag; anything stranger than that is on the regular expression. A document without a `<body>` tag gets nothing. The plugin doesn't do the rest of `addNoncePlugin`: other inline scripts and styles get no nonce from it. Where another plugin owns the server environment and `ssr` is off, such as a Cloudflare Worker that fetches `/index.html` from its assets, the plugin never sees the document, and the app adds the script itself. The test checks the markup, in dev and builds, both ways of rendering; that a queued click is replayed was checked by hand in Chromium on the playground, not in CI.
+
+**Revisit when** a server environment the plugin doesn't own needs the document, which would mean serving or emitting `index.server.html` without the `ssr` option; when an app needs the full nonce pass; or when Angular's renderer inserts the contract itself.

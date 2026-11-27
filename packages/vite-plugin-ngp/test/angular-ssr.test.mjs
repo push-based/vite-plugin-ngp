@@ -26,15 +26,29 @@ async function page(base, route, accept = 'text/html') {
   };
 }
 
+/**
+ * The event dispatch contract, ahead of everything in the body but Angular's hydration marker,
+ * then the call that starts queueing clicks.
+ */
+const EVENT_REPLAY =
+  /<body[^>]*><!--nghm--><script type="text\/javascript" id="ng-event-dispatch-contract">[\s\S]+?<\/script><script>window\.__jsaction_bootstrap\(document\.body,"ng",\["click"\],\[\]\);<\/script>/;
+
 /** Every route of the fixture, as the CLI's engine answers it. */
 async function assertRoutes(base) {
-  assert.deepEqual(await page(base, '/').then(({status, context, text}) => ({status, context, text})), {status: 200, context: 'ssg', text: 'home'});
-  assert.deepEqual(await page(base, '/about').then(({status, context, text}) => ({status, context, text})), {status: 200, context: 'ssg', text: 'about'});
-  assert.deepEqual(await page(base, '/user/42').then(({status, context, text}) => ({status, context, text})), {status: 200, context: 'ssr', text: 'user 42'});
+  const home = await page(base, '/');
+  assert.deepEqual({status: home.status, context: home.context, text: home.text}, {status: 200, context: 'ssg', text: 'home'});
+  assert.match(home.body, EVENT_REPLAY, 'a prerendered page with a listener replays events');
+  const about = await page(base, '/about');
+  assert.deepEqual({status: about.status, context: about.context, text: about.text}, {status: 200, context: 'ssg', text: 'about'});
+  assert.doesNotMatch(about.body, /ng-event-dispatch-contract/, 'a page with nothing to replay has no contract script');
+  const user = await page(base, '/user/42');
+  assert.deepEqual({status: user.status, context: user.context, text: user.text}, {status: 200, context: 'ssr', text: 'user 42'});
+  assert.match(user.body, EVENT_REPLAY, 'a page rendered on request replays events');
   const client = await page(base, '/client');
   assert.equal(client.status, 200);
   assert.equal(client.text, null, 'a Client route is not rendered on the server');
   assert.match(client.body, /<app-root><\/app-root>/);
+  assert.doesNotMatch(client.body, /ng-event-dispatch-contract/, 'a Client route has no contract script');
   const old = await page(base, '/old');
   assert.equal(old.status, 301);
   assert.match(old.location, /\/about$/);
@@ -99,6 +113,10 @@ test('vite build prerenders, writes the manifests, and server.js serves every ro
   }
   const about = await fs.readFile(path.join(dist, 'client/about/index.html'), 'utf8');
   assert.match(about, /ng-server-context="ssg"/);
+  assert.match(await fs.readFile(path.join(dist, 'client/index.html'), 'utf8'), EVENT_REPLAY, 'the prerendered file replays events');
+  const template = (name) => fs.readFile(path.join(dist, 'server/assets-chunks', name), 'utf8');
+  assert.match(await template('index_server_html.mjs'), /ng-event-dispatch-contract/, 'Angular renders into a document with the contract');
+  assert.doesNotMatch(await template('index_csr_html.mjs'), /ng-event-dispatch-contract/, "the browser's own document has none");
   const manifest = await fs.readFile(path.join(dist, 'server/angular-app-manifest.mjs'), 'utf8');
   assert.match(manifest, /"about\/index\.html": \{/, 'the prerendered page is a server asset');
   assert.match(manifest, /routes: \[/, 'the route tree is in the manifest, so the server needs no extraction');

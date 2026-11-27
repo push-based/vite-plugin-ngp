@@ -16,7 +16,8 @@ for (const locale of readdirSync(join(dist, 'server'))) {
   const entry = join(dist, 'server', locale, 'main.server.js');
   if (existsSync(entry)) {
     const {default: render} = await import(pathToFileURL(entry).href);
-    const template = readFileSync(join(dist, 'client', locale, 'index.html'), 'utf8');
+    // The browser's index.html plus Angular's event dispatch contract, which event replay needs.
+    const template = readFileSync(join(dist, 'server', locale, 'index.server.html'), 'utf8');
     locales.set(locale, {render, template, client: join(dist, 'client', locale)});
   }
 }
