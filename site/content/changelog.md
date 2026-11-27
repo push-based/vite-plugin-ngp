@@ -7,6 +7,12 @@ description: What changed in vite-plugin-ngp, newest first, for anyone following
 
 What changed in vite-plugin-ngp, newest first, written for people using it. Every entry links to the page that documents it. Versions on npm, with the commits in each, are in the repo's [CHANGELOG.md](https://github.com/push-based/vite-plugin-ngp/blob/main/CHANGELOG.md) and its [GitHub releases](https://github.com/push-based/vite-plugin-ngp/releases).
 
+## 27 November 2026
+
+### Fixes
+
+- A dev server that renders pages with a `render(url, document)` entry could answer its first page with a 500: `ENOENT: no such file or directory, rename ...tsconfig.entry.<hash>.json.<pid>.tmp`. The first request starts the browser's compiler and the server's together. Both wrote the tsconfig the analyzer reads through one temporary file, and the second to move it into place found it gone. The compiler that lost stayed failed, so pages, or the browser's modules, kept failing until a restart. How often it happened depended on timing: a test that fetches one page from a fresh dev server failed in four of five runs of the plugin's test suite. Each write now has a temporary file of its own. [How it works](how-it-works#keeping-edits-cheap-in-large-apps)
+
 ## 26 November 2026
 
 ### Server rendering
